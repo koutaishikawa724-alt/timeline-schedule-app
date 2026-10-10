@@ -10,6 +10,8 @@ export type BriefingSegment = {
   eventId?: string;
   /** サーバーで作った高品質音声。無ければ端末の音声合成で読む */
   audioUrl?: string;
+  /** 作成中の音声（ElevenLabs）。できたら再生用URI、失敗なら undefined */
+  audio?: Promise<string | undefined>;
 };
 
 const API_URL = process.env.EXPO_PUBLIC_BRIEFING_API_URL?.replace(/\/$/, '');
@@ -351,9 +353,15 @@ export function playBriefing(
     onSegment(i);
     const seg = segments[i];
 
-    if (seg.audioUrl) {
+    let uri = seg.audioUrl;
+    if (!uri && seg.audio) {
+      uri = await Promise.race([seg.audio, new Promise<undefined>((r) => setTimeout(() => r(undefined), 20_000))]);
+      if (cancelled) return;
+    }
+
+    if (uri) {
       try {
-        player = playSource({ uri: seg.audioUrl }, () => nextAfterGap(i + 1));
+        player = playSource({ uri }, () => nextAfterGap(i + 1));
         return;
       } catch {
         // 再生できなければ端末の音声で読む

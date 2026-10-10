@@ -3,6 +3,7 @@ import { Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextI
 import { colors } from '../theme';
 import { NarrationStyle, PITCH_OPTIONS, RATE_OPTIONS, Settings, STYLE_LABELS } from '../settings';
 import { listJapaneseVoices, previewVoice, VoiceOption } from '../briefing';
+import { ELEVEN_VOICES, ElevenError, getElevenQuota, previewEleven } from '../eleven';
 
 type Props = {
   visible: boolean;
@@ -36,9 +37,32 @@ export default function SettingsSheet({ visible, settings, onChange, onClose }: 
     if (visible && voices === null) listJapaneseVoices().then(setVoices);
   }, [visible, voices]);
 
+  const [elevenStatus, setElevenStatus] = useState<string>('');
+
   const set = (patch: Partial<Settings>) => onChange({ ...settings, ...patch });
-  const sample = (s: Settings) =>
-    previewVoice(`${s.name ? `${s.name}さん、` : ''}${STYLE_SAMPLE[s.style]}`, s);
+  const sampleText = (s: Settings) => `${s.name ? `${s.name}さん、` : ''}${STYLE_SAMPLE[s.style]}`;
+  const sample = (s: Settings) => {
+    if (s.elevenKey.trim()) {
+      setElevenStatus('AIボイスを準備中…');
+      previewEleven(sampleText(s), s.elevenKey.trim(), s.elevenVoice)
+        .then(() => setElevenStatus(''))
+        .catch((e) => setElevenStatus(describeElevenError(e)));
+    } else {
+      previewVoice(sampleText(s), s);
+    }
+  };
+
+  const checkEleven = async () => {
+    const key = settings.elevenKey.trim();
+    if (!key) return setElevenStatus('APIキーを入力してください');
+    setElevenStatus('確認中…');
+    try {
+      const q = await getElevenQuota(key);
+      setElevenStatus(`接続OK。今月の残り：${Math.max(0, q.limit - q.used).toLocaleString()}文字（1回の読み上げで約300文字）`);
+    } catch (e) {
+      setElevenStatus(describeElevenError(e));
+    }
+  };
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -81,7 +105,45 @@ export default function SettingsSheet({ visible, settings, onChange, onClose }: 
               ))}
             </View>
 
-            <Text style={styles.label}>声</Text>
+            <Text style={styles.label}>AIボイス（ElevenLabs）</Text>
+            <TextInput
+              value={settings.elevenKey}
+              onChangeText={(elevenKey) => set({ elevenKey })}
+              placeholder="APIキーを貼り付け（空なら端末の声）"
+              placeholderTextColor={colors.textMuted}
+              style={styles.input}
+              autoCapitalize="none"
+              autoCorrect={false}
+              secureTextEntry
+            />
+            <View style={[styles.row, { marginTop: 8 }]}>
+              <Pressable onPress={checkEleven} style={[styles.chip, { flex: 0, paddingHorizontal: 16 }]}>
+                <Text style={styles.chipText}>接続を確認</Text>
+              </Pressable>
+            </View>
+            {elevenStatus ? <Text style={[styles.note, { color: colors.text }]}>{elevenStatus}</Text> : null}
+            {settings.elevenKey.trim() ? (
+              <View style={[styles.voiceList, { marginTop: 10 }]}>
+                {ELEVEN_VOICES.map((v) => (
+                  <VoiceRow
+                    key={v.id}
+                    name={v.name}
+                    sub={v.desc}
+                    active={settings.elevenVoice === v.id}
+                    onPress={() => {
+                      const next = { ...settings, elevenVoice: v.id };
+                      onChange(next);
+                      sample(next);
+                    }}
+                  />
+                ))}
+              </View>
+            ) : null}
+            <Text style={styles.note}>
+              elevenlabs.io で無料登録 → 左下のアカウント →「API Keys」でキーを作成して貼り付けます。キーはこのスマホの中だけに保存されます。
+            </Text>
+
+            <Text style={styles.label}>端末の声（AIボイス未設定のとき）</Text>
             <View style={styles.voiceList}>
               <VoiceRow
                 name="おまかせ"
@@ -164,6 +226,15 @@ export default function SettingsSheet({ visible, settings, onChange, onClose }: 
       </View>
     </Modal>
   );
+}
+
+function describeElevenError(e: unknown): string {
+  if (e instanceof ElevenError) {
+    if (e.status === 401) return 'APIキーが正しくないようです。コピーし直してみてください。';
+    if (e.status === 402 || /quota/i.test(e.message)) return '今月の無料枠を使い切りました。端末の声で読み上げます。';
+    return `ElevenLabs でエラーが起きました（${e.status}）。`;
+  }
+  return 'ElevenLabs に接続できませんでした。通信を確認してください。';
 }
 
 function VoiceRow({ name, sub, active, onPress }: { name: string; sub?: string; active: boolean; onPress: () => void }) {

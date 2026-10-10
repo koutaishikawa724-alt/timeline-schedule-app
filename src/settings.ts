@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DEFAULT_ELEVEN_VOICE } from './eleven';
 
 export type NarrationStyle = 'mission' | 'dj' | 'cool';
 
@@ -14,6 +15,9 @@ export type Settings = {
   sound: boolean;
   /** 読み上げ中のBGM */
   bgm: boolean;
+  /** ElevenLabs のAPIキー（この端末の中だけに保存）。空なら端末の声 */
+  elevenKey: string;
+  elevenVoice: string;
 };
 
 export const RATE_OPTIONS = [
@@ -31,7 +35,7 @@ export const PITCH_OPTIONS = [
 const snap = (value: number, options: { value: number }[]) =>
   options.reduce((best, o) => (Math.abs(o.value - value) < Math.abs(best - value) ? o.value : best), options[0].value);
 
-export const defaultSettings: Settings = { name: '', style: 'mission', rate: 0.95, pitch: 0.9, sound: true, bgm: true };
+export const defaultSettings: Settings = { name: '', style: 'mission', rate: 0.95, pitch: 0.9, sound: true, bgm: true, elevenKey: '', elevenVoice: DEFAULT_ELEVEN_VOICE };
 
 export const STYLE_LABELS: Record<NarrationStyle, { label: string; desc: string }> = {
   mission: { label: 'ミッション', desc: '作戦会議風' },

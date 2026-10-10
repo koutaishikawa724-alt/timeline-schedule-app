@@ -9,6 +9,7 @@ import EventEditor from './src/components/EventEditor';
 import BriefingOverlay from './src/components/BriefingOverlay';
 import { CalendarTabIcon, CircleTabIcon, VoiceIcon } from './src/components/TabIcons';
 import SettingsSheet from './src/components/SettingsSheet';
+import { prefetchEleven } from './src/eleven';
 import { defaultSettings, loadSettings, saveSettings, Settings } from './src/settings';
 import {
   aiBriefingEnabled,
@@ -116,6 +117,15 @@ function Main() {
     const ai = await fetchAiBriefing(selectedKey, events, dayLabel);
     if (run !== briefRun.current) return; // 準備中に停止された
     const segs = ai ?? buildBriefing(selectedKey, events, dayLabel, { name: settings.name, style: settings.style });
+    // ElevenLabs のキーがあれば、AIの声を裏で作り始める（できた文から順に再生）
+    if (settings.elevenKey.trim() && !segs.some((sg) => sg.audioUrl)) {
+      const audio = prefetchEleven(
+        segs.map((sg) => sg.text),
+        settings.elevenKey.trim(),
+        settings.elevenVoice,
+      );
+      segs.forEach((sg, i) => (sg.audio = audio[i]));
+    }
     setBriefing(segs);
     briefHandle.current = playBriefing(segs, settings, setBriefIndex, () => {
       briefHandle.current = null;
