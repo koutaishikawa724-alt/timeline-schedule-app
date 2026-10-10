@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -47,9 +48,12 @@ export default function EventEditor({ visible, initial, defaultStart, dayLabel, 
   const [minute, setMinute] = useState(0);
   const [duration, setDuration] = useState(60);
   const [color, setColor] = useState(eventPalette[0]);
+  const [missingTitle, setMissingTitle] = useState(false);
+  const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     if (!visible) return;
+    setMissingTitle(false);
     if (initial) {
       setTitle(initial.title);
       setHour(Math.floor(initial.start / 60));
@@ -69,77 +73,105 @@ export default function EventEditor({ visible, initial, defaultStart, dayLabel, 
   const end = Math.min(start + duration, 1440);
   const canSave = title.trim().length > 0;
 
+  /** 名前が空なら知らせて入力欄へ。押せないボタンにはしない（理由がわからなくなるので） */
+  const trySave = () => {
+    if (!canSave) {
+      setMissingTitle(true);
+      inputRef.current?.focus();
+      return;
+    }
+    Keyboard.dismiss();
+    onSave({ id: initial?.id, title: title.trim(), start, end, color });
+  };
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.backdrop}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={styles.sheet}>
           <View style={styles.grabber} />
+          {/* 保存はいちばん上にも置く（キーボードが出ていても押せるように） */}
           <View style={styles.headerRow}>
-            <Text style={styles.heading}>{initial ? '予定を編集' : `${dayLabel}の予定を追加`}</Text>
-            <Text style={[styles.range, { color }]}>
-              {formatTime(start)} – {formatTime(end)}
-            </Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.heading}>{initial ? '予定を編集' : `${dayLabel}の予定を追加`}</Text>
+              <Text style={[styles.range, { color }]}>
+                {formatTime(start)} – {formatTime(end)}
+              </Text>
+            </View>
+            <Pressable onPress={trySave} hitSlop={8} style={[styles.headerSave, { backgroundColor: color }]}>
+              <Text style={[styles.headerSaveText, { color: colors.bg }]}>保存</Text>
+            </Pressable>
           </View>
 
           <TextInput
+            ref={inputRef}
             value={title}
-            onChangeText={setTitle}
+            onChangeText={(t) => {
+              setTitle(t);
+              if (t.trim()) setMissingTitle(false);
+            }}
             placeholder="例：朝ラン、打ち合わせ、ジム"
             placeholderTextColor={colors.textMuted}
-            style={styles.input}
+            style={[styles.input, missingTitle && styles.inputError]}
             autoFocus={!initial}
             returnKeyType="done"
           />
+          {missingTitle && <Text style={styles.error}>予定の名前を入れてください</Text>}
 
-          <Text style={styles.label}>開始（時）</Text>
-          <View style={styles.hourGrid}>
-            {HOURS.map((h) => (
-              <View key={h} style={styles.hourCell}>
-                <Chip label={`${h}`} active={h === hour} onPress={() => setHour(h)} />
-              </View>
-            ))}
-          </View>
+          <ScrollView
+            style={styles.body}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            showsVerticalScrollIndicator={false}
+          >
+            <Text style={styles.label}>開始（時）</Text>
+            <View style={styles.hourGrid}>
+              {HOURS.map((h) => (
+                <View key={h} style={styles.hourCell}>
+                  <Chip label={`${h}`} active={h === hour} onPress={() => setHour(h)} />
+                </View>
+              ))}
+            </View>
 
-          <Text style={styles.label}>開始（分）</Text>
-          <View style={styles.row}>
-            {MINUTES.map((m) => (
-              <Chip key={m} label={`:${`${m}`.padStart(2, '0')}`} active={m === minute} onPress={() => setMinute(m)} />
-            ))}
-          </View>
+            <Text style={styles.label}>開始（分）</Text>
+            <View style={styles.row}>
+              {MINUTES.map((m) => (
+                <Chip key={m} label={`:${`${m}`.padStart(2, '0')}`} active={m === minute} onPress={() => setMinute(m)} />
+              ))}
+            </View>
 
-          <Text style={styles.label}>長さ</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-            {DURATIONS.map((d) => (
-              <Chip key={d} label={durationLabel(d)} active={d === duration} onPress={() => setDuration(d)} />
-            ))}
-          </ScrollView>
+            <Text style={styles.label}>長さ</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+              {DURATIONS.map((d) => (
+                <Chip key={d} label={durationLabel(d)} active={d === duration} onPress={() => setDuration(d)} />
+              ))}
+            </ScrollView>
 
-          <Text style={styles.label}>カラー</Text>
-          <View style={styles.row}>
-            {eventPalette.map((p) => (
+            <Text style={styles.label}>カラー</Text>
+            <View style={styles.row}>
+              {eventPalette.map((p) => (
+                <Pressable
+                  key={p}
+                  onPress={() => setColor(p)}
+                  style={[styles.swatch, { backgroundColor: p }, p === color && styles.swatchActive]}
+                />
+              ))}
+            </View>
+
+            <View style={styles.actions}>
+              {initial && onDelete && (
+                <Pressable onPress={() => onDelete(initial.id)} style={[styles.button, styles.deleteButton]}>
+                  <Text style={[styles.buttonText, { color: colors.danger }]}>削除</Text>
+                </Pressable>
+              )}
               <Pressable
-                key={p}
-                onPress={() => setColor(p)}
-                style={[styles.swatch, { backgroundColor: p }, p === color && styles.swatchActive]}
-              />
-            ))}
-          </View>
-
-          <View style={styles.actions}>
-            {initial && onDelete && (
-              <Pressable onPress={() => onDelete(initial.id)} style={[styles.button, styles.deleteButton]}>
-                <Text style={[styles.buttonText, { color: colors.danger }]}>削除</Text>
+                onPress={trySave}
+                style={[styles.button, styles.saveButton, { backgroundColor: color }]}
+              >
+                <Text style={[styles.buttonText, { color: colors.bg }]}>保存</Text>
               </Pressable>
-            )}
-            <Pressable
-              disabled={!canSave}
-              onPress={() => onSave({ id: initial?.id, title: title.trim(), start, end, color })}
-              style={[styles.button, styles.saveButton, { backgroundColor: color }, !canSave && { opacity: 0.35 }]}
-            >
-              <Text style={[styles.buttonText, { color: colors.bg }]}>保存</Text>
-            </Pressable>
-          </View>
+            </View>
+          </ScrollView>
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -158,12 +190,18 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     width: '100%',
     maxWidth: 560,
+    maxHeight: '94%',
     alignSelf: 'center',
   },
+  body: { flexShrink: 1 },
+  headerSave: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 14, marginLeft: 12 },
+  headerSaveText: { fontSize: 15, fontWeight: '700' },
+  inputError: { borderWidth: 1, borderColor: colors.danger },
+  error: { color: colors.danger, fontSize: 13, marginBottom: 4 },
   grabber: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginBottom: 14 },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   heading: { color: colors.text, fontSize: 18, fontWeight: '700' },
-  range: { fontSize: 16, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  range: { marginTop: 2, fontSize: 16, fontWeight: '600', fontVariant: ['tabular-nums'] },
   input: {
     backgroundColor: colors.surfaceHigh,
     color: colors.text,

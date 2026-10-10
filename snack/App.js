@@ -21,7 +21,7 @@ var require_bgm = __commonJS({
 });
 
 // ../../../../../../home/claude/schedule-app/App.tsx
-import { useCallback, useEffect as useEffect4, useMemo as useMemo2, useRef as useRef2, useState as useState4 } from "react";
+import { useCallback, useEffect as useEffect4, useMemo as useMemo2, useRef as useRef3, useState as useState4 } from "react";
 import { Pressable as Pressable6, ScrollView as ScrollView3, StyleSheet as StyleSheet7, Text as Text7, useWindowDimensions, View as View7 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
@@ -415,8 +415,9 @@ var styles3 = StyleSheet3.create({
 });
 
 // ../../../../../../home/claude/schedule-app/src/components/EventEditor.tsx
-import { useEffect, useState as useState2 } from "react";
+import { useEffect, useRef, useState as useState2 } from "react";
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -444,8 +445,11 @@ function EventEditor({ visible, initial, defaultStart, dayLabel, onSave, onDelet
   const [minute, setMinute] = useState2(0);
   const [duration, setDuration] = useState2(60);
   const [color, setColor] = useState2(eventPalette[0]);
+  const [missingTitle, setMissingTitle] = useState2(false);
+  const inputRef = useRef(null);
   useEffect(() => {
     if (!visible) return;
+    setMissingTitle(false);
     if (initial) {
       setTitle(initial.title);
       setHour(Math.floor(initial.start / 60));
@@ -463,57 +467,84 @@ function EventEditor({ visible, initial, defaultStart, dayLabel, onSave, onDelet
   const start = hour * 60 + minute;
   const end = Math.min(start + duration, 1440);
   const canSave = title.trim().length > 0;
+  const trySave = () => {
+    if (!canSave) {
+      setMissingTitle(true);
+      inputRef.current?.focus();
+      return;
+    }
+    Keyboard.dismiss();
+    onSave({ id: initial?.id, title: title.trim(), start, end, color });
+  };
   return /* @__PURE__ */ jsx4(Modal, { visible, transparent: true, animationType: "slide", onRequestClose: onClose, children: /* @__PURE__ */ jsxs4(KeyboardAvoidingView, { behavior: Platform.OS === "ios" ? "padding" : void 0, style: styles4.backdrop, children: [
     /* @__PURE__ */ jsx4(Pressable3, { style: StyleSheet4.absoluteFill, onPress: onClose }),
     /* @__PURE__ */ jsxs4(View4, { style: styles4.sheet, children: [
       /* @__PURE__ */ jsx4(View4, { style: styles4.grabber }),
       /* @__PURE__ */ jsxs4(View4, { style: styles4.headerRow, children: [
-        /* @__PURE__ */ jsx4(Text4, { style: styles4.heading, children: initial ? "予定を編集" : `${dayLabel}の予定を追加` }),
-        /* @__PURE__ */ jsxs4(Text4, { style: [styles4.range, { color }], children: [
-          formatTime(start),
-          " – ",
-          formatTime(end)
-        ] })
+        /* @__PURE__ */ jsxs4(View4, { style: { flex: 1 }, children: [
+          /* @__PURE__ */ jsx4(Text4, { style: styles4.heading, children: initial ? "予定を編集" : `${dayLabel}の予定を追加` }),
+          /* @__PURE__ */ jsxs4(Text4, { style: [styles4.range, { color }], children: [
+            formatTime(start),
+            " – ",
+            formatTime(end)
+          ] })
+        ] }),
+        /* @__PURE__ */ jsx4(Pressable3, { onPress: trySave, hitSlop: 8, style: [styles4.headerSave, { backgroundColor: color }], children: /* @__PURE__ */ jsx4(Text4, { style: [styles4.headerSaveText, { color: colors.bg }], children: "保存" }) })
       ] }),
       /* @__PURE__ */ jsx4(
         TextInput,
         {
+          ref: inputRef,
           value: title,
-          onChangeText: setTitle,
+          onChangeText: (t) => {
+            setTitle(t);
+            if (t.trim()) setMissingTitle(false);
+          },
           placeholder: "例：朝ラン、打ち合わせ、ジム",
           placeholderTextColor: colors.textMuted,
-          style: styles4.input,
+          style: [styles4.input, missingTitle && styles4.inputError],
           autoFocus: !initial,
           returnKeyType: "done"
         }
       ),
-      /* @__PURE__ */ jsx4(Text4, { style: styles4.label, children: "開始（時）" }),
-      /* @__PURE__ */ jsx4(View4, { style: styles4.hourGrid, children: HOURS.map((h) => /* @__PURE__ */ jsx4(View4, { style: styles4.hourCell, children: /* @__PURE__ */ jsx4(Chip, { label: `${h}`, active: h === hour, onPress: () => setHour(h) }) }, h)) }),
-      /* @__PURE__ */ jsx4(Text4, { style: styles4.label, children: "開始（分）" }),
-      /* @__PURE__ */ jsx4(View4, { style: styles4.row, children: MINUTES.map((m) => /* @__PURE__ */ jsx4(Chip, { label: `:${`${m}`.padStart(2, "0")}`, active: m === minute, onPress: () => setMinute(m) }, m)) }),
-      /* @__PURE__ */ jsx4(Text4, { style: styles4.label, children: "長さ" }),
-      /* @__PURE__ */ jsx4(ScrollView, { horizontal: true, showsHorizontalScrollIndicator: false, contentContainerStyle: styles4.row, children: DURATIONS.map((d) => /* @__PURE__ */ jsx4(Chip, { label: durationLabel(d), active: d === duration, onPress: () => setDuration(d) }, d)) }),
-      /* @__PURE__ */ jsx4(Text4, { style: styles4.label, children: "カラー" }),
-      /* @__PURE__ */ jsx4(View4, { style: styles4.row, children: eventPalette.map((p) => /* @__PURE__ */ jsx4(
-        Pressable3,
+      missingTitle && /* @__PURE__ */ jsx4(Text4, { style: styles4.error, children: "予定の名前を入れてください" }),
+      /* @__PURE__ */ jsxs4(
+        ScrollView,
         {
-          onPress: () => setColor(p),
-          style: [styles4.swatch, { backgroundColor: p }, p === color && styles4.swatchActive]
-        },
-        p
-      )) }),
-      /* @__PURE__ */ jsxs4(View4, { style: styles4.actions, children: [
-        initial && onDelete && /* @__PURE__ */ jsx4(Pressable3, { onPress: () => onDelete(initial.id), style: [styles4.button, styles4.deleteButton], children: /* @__PURE__ */ jsx4(Text4, { style: [styles4.buttonText, { color: colors.danger }], children: "削除" }) }),
-        /* @__PURE__ */ jsx4(
-          Pressable3,
-          {
-            disabled: !canSave,
-            onPress: () => onSave({ id: initial?.id, title: title.trim(), start, end, color }),
-            style: [styles4.button, styles4.saveButton, { backgroundColor: color }, !canSave && { opacity: 0.35 }],
-            children: /* @__PURE__ */ jsx4(Text4, { style: [styles4.buttonText, { color: colors.bg }], children: "保存" })
-          }
-        )
-      ] })
+          style: styles4.body,
+          keyboardShouldPersistTaps: "handled",
+          keyboardDismissMode: "on-drag",
+          showsVerticalScrollIndicator: false,
+          children: [
+            /* @__PURE__ */ jsx4(Text4, { style: styles4.label, children: "開始（時）" }),
+            /* @__PURE__ */ jsx4(View4, { style: styles4.hourGrid, children: HOURS.map((h) => /* @__PURE__ */ jsx4(View4, { style: styles4.hourCell, children: /* @__PURE__ */ jsx4(Chip, { label: `${h}`, active: h === hour, onPress: () => setHour(h) }) }, h)) }),
+            /* @__PURE__ */ jsx4(Text4, { style: styles4.label, children: "開始（分）" }),
+            /* @__PURE__ */ jsx4(View4, { style: styles4.row, children: MINUTES.map((m) => /* @__PURE__ */ jsx4(Chip, { label: `:${`${m}`.padStart(2, "0")}`, active: m === minute, onPress: () => setMinute(m) }, m)) }),
+            /* @__PURE__ */ jsx4(Text4, { style: styles4.label, children: "長さ" }),
+            /* @__PURE__ */ jsx4(ScrollView, { horizontal: true, showsHorizontalScrollIndicator: false, contentContainerStyle: styles4.row, children: DURATIONS.map((d) => /* @__PURE__ */ jsx4(Chip, { label: durationLabel(d), active: d === duration, onPress: () => setDuration(d) }, d)) }),
+            /* @__PURE__ */ jsx4(Text4, { style: styles4.label, children: "カラー" }),
+            /* @__PURE__ */ jsx4(View4, { style: styles4.row, children: eventPalette.map((p) => /* @__PURE__ */ jsx4(
+              Pressable3,
+              {
+                onPress: () => setColor(p),
+                style: [styles4.swatch, { backgroundColor: p }, p === color && styles4.swatchActive]
+              },
+              p
+            )) }),
+            /* @__PURE__ */ jsxs4(View4, { style: styles4.actions, children: [
+              initial && onDelete && /* @__PURE__ */ jsx4(Pressable3, { onPress: () => onDelete(initial.id), style: [styles4.button, styles4.deleteButton], children: /* @__PURE__ */ jsx4(Text4, { style: [styles4.buttonText, { color: colors.danger }], children: "削除" }) }),
+              /* @__PURE__ */ jsx4(
+                Pressable3,
+                {
+                  onPress: trySave,
+                  style: [styles4.button, styles4.saveButton, { backgroundColor: color }],
+                  children: /* @__PURE__ */ jsx4(Text4, { style: [styles4.buttonText, { color: colors.bg }], children: "保存" })
+                }
+              )
+            ] })
+          ]
+        }
+      )
     ] })
   ] }) });
 }
@@ -529,12 +560,18 @@ var styles4 = StyleSheet4.create({
     borderColor: colors.border,
     width: "100%",
     maxWidth: 560,
+    maxHeight: "94%",
     alignSelf: "center"
   },
+  body: { flexShrink: 1 },
+  headerSave: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 14, marginLeft: 12 },
+  headerSaveText: { fontSize: 15, fontWeight: "700" },
+  inputError: { borderWidth: 1, borderColor: colors.danger },
+  error: { color: colors.danger, fontSize: 13, marginBottom: 4 },
   grabber: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: "center", marginBottom: 14 },
-  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 },
+  headerRow: { flexDirection: "row", alignItems: "center", marginBottom: 14 },
   heading: { color: colors.text, fontSize: 18, fontWeight: "700" },
-  range: { fontSize: 16, fontWeight: "600", fontVariant: ["tabular-nums"] },
+  range: { marginTop: 2, fontSize: 16, fontWeight: "600", fontVariant: ["tabular-nums"] },
   input: {
     backgroundColor: colors.surfaceHigh,
     color: colors.text,
@@ -569,12 +606,12 @@ var styles4 = StyleSheet4.create({
 });
 
 // ../../../../../../home/claude/schedule-app/src/components/BriefingOverlay.tsx
-import { useEffect as useEffect2, useRef } from "react";
+import { useEffect as useEffect2, useRef as useRef2 } from "react";
 import { Animated, Easing, Modal as Modal2, Pressable as Pressable4, StyleSheet as StyleSheet5, Text as Text5, View as View5 } from "react-native";
 import { jsx as jsx5, jsxs as jsxs5 } from "react/jsx-runtime";
 function BriefingOverlay({ visible, segments, index, events, title, onStop }) {
-  const pulse = useRef(new Animated.Value(0)).current;
-  const fade = useRef(new Animated.Value(0)).current;
+  const pulse = useRef2(new Animated.Value(0)).current;
+  const fade = useRef2(new Animated.Value(0)).current;
   useEffect2(() => {
     if (!visible) return;
     const loop = Animated.loop(
@@ -594,7 +631,7 @@ function BriefingOverlay({ visible, segments, index, events, title, onStop }) {
   const seg = segments[index];
   const ev = events.find((e) => e.id === seg?.eventId);
   const accent = ev?.color ?? colors.accent;
-  const halfRef = useRef(defaultHalf(events));
+  const halfRef = useRef2(defaultHalf(events));
   if (ev) halfRef.current = ev.start >= 720 ? 1 : 0;
   else if (index === 0) halfRef.current = defaultHalf(events);
   const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
@@ -1397,11 +1434,11 @@ function Main() {
   const [undo, setUndo] = useState4(null);
   const [settings, setSettings] = useState4(defaultSettings);
   const [settingsOpen, setSettingsOpen] = useState4(false);
-  const toastTimer = useRef2(null);
+  const toastTimer = useRef3(null);
   const [briefing, setBriefing] = useState4(null);
   const [briefIndex, setBriefIndex] = useState4(0);
-  const briefHandle = useRef2(null);
-  const briefRun = useRef2(0);
+  const briefHandle = useRef3(null);
+  const briefRun = useRef3(0);
   useEffect4(() => {
     loadSettings().then(setSettings);
     loadSchedules().then((s) => {
