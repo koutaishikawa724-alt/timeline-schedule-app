@@ -339,7 +339,7 @@ var styles2 = StyleSheet2.create({
 // ../../../../../../home/claude/schedule-app/src/components/EventList.tsx
 import { Pressable as Pressable2, StyleSheet as StyleSheet3, Text as Text3, View as View3 } from "react-native";
 import { jsx as jsx3, jsxs as jsxs3 } from "react/jsx-runtime";
-function EventList({ events, nowMin, highlightId, onPress }) {
+function EventList({ events, nowMin, highlightId, onPress, onDelete }) {
   const sorted = [...events].sort((a, b) => a.start - b.start);
   if (sorted.length === 0) {
     return /* @__PURE__ */ jsxs3(View3, { style: styles3.empty, children: [
@@ -363,7 +363,17 @@ function EventList({ events, nowMin, highlightId, onPress }) {
             /* @__PURE__ */ jsx3(Text3, { style: styles3.end, children: formatTime(ev.end) })
           ] }),
           /* @__PURE__ */ jsx3(Text3, { style: styles3.title, numberOfLines: 1, children: ev.title }),
-          live && /* @__PURE__ */ jsx3(View3, { style: [styles3.live, { backgroundColor: ev.color }], children: /* @__PURE__ */ jsx3(Text3, { style: styles3.liveText, children: "NOW" }) })
+          live && /* @__PURE__ */ jsx3(View3, { style: [styles3.live, { backgroundColor: ev.color }], children: /* @__PURE__ */ jsx3(Text3, { style: styles3.liveText, children: "NOW" }) }),
+          onDelete && /* @__PURE__ */ jsx3(
+            Pressable2,
+            {
+              onPress: () => onDelete(ev.id),
+              hitSlop: 10,
+              style: styles3.delete,
+              accessibilityLabel: `${ev.title}を削除`,
+              children: /* @__PURE__ */ jsx3(Text3, { style: styles3.deleteText, children: "×" })
+            }
+          )
         ]
       },
       ev.id
@@ -387,6 +397,16 @@ var styles3 = StyleSheet3.create({
   start: { color: colors.text, fontSize: 15, fontWeight: "700", fontVariant: ["tabular-nums"] },
   end: { color: colors.textMuted, fontSize: 12, fontVariant: ["tabular-nums"] },
   title: { flex: 1, color: colors.text, fontSize: 16, marginLeft: 8 },
+  delete: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    marginLeft: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,92,122,0.12)"
+  },
+  deleteText: { color: colors.danger, fontSize: 18, lineHeight: 20, fontWeight: "600" },
   live: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   liveText: { color: colors.bg, fontSize: 10, fontWeight: "800", letterSpacing: 1 },
   empty: { alignItems: "center", paddingVertical: 28 },
@@ -1373,7 +1393,8 @@ function Main() {
   const [tab, setTab] = useState4("circle");
   const [editing, setEditing] = useState4();
   const [editorOpen, setEditorOpen] = useState4(false);
-  const [toast, setToast] = useState4(false);
+  const [toast, setToast] = useState4(null);
+  const [undo, setUndo] = useState4(null);
   const [settings, setSettings] = useState4(defaultSettings);
   const [settingsOpen, setSettingsOpen] = useState4(false);
   const toastTimer = useRef2(null);
@@ -1413,10 +1434,10 @@ function Main() {
     setEditing(ev);
     setEditorOpen(true);
   };
-  const showToast = () => {
-    setToast(true);
+  const showToast = (kind) => {
+    setToast(kind);
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(false), 6e3);
+    toastTimer.current = setTimeout(() => setToast(null), 6e3);
   };
   const handleSave = (draft) => {
     setSchedules((prev) => {
@@ -1426,14 +1447,30 @@ function Main() {
       return { ...prev, [selectedKey]: updated.sort((a, b) => a.start - b.start) };
     });
     setEditorOpen(false);
-    showToast();
+    showToast("saved");
   };
-  const handleDelete = (id) => {
-    setSchedules((prev) => ({ ...prev, [selectedKey]: (prev[selectedKey] ?? []).filter((e) => e.id !== id) }));
+  const deleteEvents = (ids) => {
+    const before = schedules[selectedKey] ?? [];
+    const removed = ids ? before.filter((e) => ids.includes(e.id)) : before;
+    if (removed.length === 0) return;
+    setUndo({
+      key: selectedKey,
+      events: before,
+      label: removed.length === 1 ? `「${removed[0].title}」を消しました` : `${removed.length}件の予定を消しました`
+    });
+    setSchedules((prev) => ({ ...prev, [selectedKey]: ids ? before.filter((e) => !ids.includes(e.id)) : [] }));
     setEditorOpen(false);
+    showToast("deleted");
+  };
+  const handleDelete = (id) => deleteEvents([id]);
+  const undoDelete = () => {
+    if (!undo) return;
+    setSchedules((prev) => ({ ...prev, [undo.key]: undo.events }));
+    setUndo(null);
+    setToast(null);
   };
   const startBriefing = useCallback(async () => {
-    setToast(false);
+    setToast(null);
     const run = ++briefRun.current;
     setBriefIndex(0);
     setBriefing([]);
@@ -1538,12 +1575,19 @@ function Main() {
           ] })
         ] })
       ] }),
-      /* @__PURE__ */ jsx8(Text7, { style: styles7.section, children: "タイムライン" }),
-      /* @__PURE__ */ jsx8(EventList, { events, nowMin, onPress: openEdit })
+      /* @__PURE__ */ jsxs8(View7, { style: styles7.sectionRow, children: [
+        /* @__PURE__ */ jsx8(Text7, { style: styles7.section, children: "タイムライン" }),
+        events.length > 1 && /* @__PURE__ */ jsx8(Pressable6, { onPress: () => deleteEvents(), hitSlop: 8, children: /* @__PURE__ */ jsx8(Text7, { style: styles7.clearAll, children: "すべて消す" }) })
+      ] }),
+      /* @__PURE__ */ jsx8(EventList, { events, nowMin, onPress: openEdit, onDelete: handleDelete })
     ] }),
-    toast && /* @__PURE__ */ jsxs8(View7, { style: styles7.toast, children: [
+    toast === "saved" && /* @__PURE__ */ jsxs8(View7, { style: styles7.toast, children: [
       /* @__PURE__ */ jsx8(Text7, { style: styles7.toastText, children: "スケジュールを更新しました" }),
       /* @__PURE__ */ jsx8(Pressable6, { onPress: startBriefing, hitSlop: 8, children: /* @__PURE__ */ jsx8(Text7, { style: styles7.toastAction, children: "▶ 読み上げる" }) })
+    ] }),
+    toast === "deleted" && undo && /* @__PURE__ */ jsxs8(View7, { style: styles7.toast, children: [
+      /* @__PURE__ */ jsx8(Text7, { style: [styles7.toastText, { flex: 1 }], numberOfLines: 1, children: undo.label }),
+      /* @__PURE__ */ jsx8(Pressable6, { onPress: undoDelete, hitSlop: 8, children: /* @__PURE__ */ jsx8(Text7, { style: styles7.toastAction, children: "元に戻す" }) })
     ] }),
     /* @__PURE__ */ jsx8(Pressable6, { onPress: openNew, style: styles7.fab, children: /* @__PURE__ */ jsx8(Text7, { style: styles7.fabText, children: "＋" }) }),
     /* @__PURE__ */ jsx8(SafeAreaView, { edges: ["bottom"], style: styles7.tabBar, children: [
@@ -1659,6 +1703,8 @@ var styles7 = StyleSheet7.create({
   playGlyph: { color: "#fff", fontSize: 16, marginLeft: 3 },
   briefTitle: { color: colors.text, fontSize: 16, fontWeight: "700" },
   briefSub: { color: colors.textSub, fontSize: 12, marginTop: 2 },
+  sectionRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
+  clearAll: { color: colors.danger, fontSize: 12, fontWeight: "700" },
   section: { color: colors.textSub, fontSize: 12, letterSpacing: 2, marginTop: 26, marginBottom: 10, fontWeight: "700" },
   fab: {
     position: "absolute",

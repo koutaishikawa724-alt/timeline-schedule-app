@@ -47,7 +47,9 @@ function Main() {
   const [tab, setTab] = useState<Tab>('circle');
   const [editing, setEditing] = useState<ScheduleEvent | undefined>();
   const [editorOpen, setEditorOpen] = useState(false);
-  const [toast, setToast] = useState(false);
+  // 下に出るお知らせ。'saved' = 保存後の読み上げ案内、'deleted' = 削除の取り消し
+  const [toast, setToast] = useState<null | 'saved' | 'deleted'>(null);
+  const [undo, setUndo] = useState<{ key: string; events: ScheduleEvent[]; label: string } | null>(null);
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -96,10 +98,10 @@ function Main() {
     setEditorOpen(true);
   };
 
-  const showToast = () => {
-    setToast(true);
+  const showToast = (kind: 'saved' | 'deleted') => {
+    setToast(kind);
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(false), 6000);
+    toastTimer.current = setTimeout(() => setToast(null), 6000);
   };
 
   const handleSave = (draft: Omit<ScheduleEvent, 'id'> & { id?: string }) => {
@@ -110,16 +112,35 @@ function Main() {
       return { ...prev, [selectedKey]: updated.sort((a, b) => a.start - b.start) };
     });
     setEditorOpen(false);
-    showToast();
+    showToast('saved');
   };
 
-  const handleDelete = (id: string) => {
-    setSchedules((prev) => ({ ...prev, [selectedKey]: (prev[selectedKey] ?? []).filter((e) => e.id !== id) }));
+  /** 予定を消す（ids を省くとその日の全部）。直前の状態を覚えておき「元に戻す」で戻せる */
+  const deleteEvents = (ids?: string[]) => {
+    const before = schedules[selectedKey] ?? [];
+    const removed = ids ? before.filter((e) => ids.includes(e.id)) : before;
+    if (removed.length === 0) return;
+    setUndo({
+      key: selectedKey,
+      events: before,
+      label: removed.length === 1 ? `「${removed[0].title}」を消しました` : `${removed.length}件の予定を消しました`,
+    });
+    setSchedules((prev) => ({ ...prev, [selectedKey]: ids ? before.filter((e) => !ids.includes(e.id)) : [] }));
     setEditorOpen(false);
+    showToast('deleted');
+  };
+
+  const handleDelete = (id: string) => deleteEvents([id]);
+
+  const undoDelete = () => {
+    if (!undo) return;
+    setSchedules((prev) => ({ ...prev, [undo.key]: undo.events }));
+    setUndo(null);
+    setToast(null);
   };
 
   const startBriefing = useCallback(async () => {
-    setToast(false);
+    setToast(null);
     const run = ++briefRun.current;
     setBriefIndex(0);
     setBriefing([]); // 空 = 原稿を準備中
@@ -238,15 +259,32 @@ function Main() {
           </View>
         </Pressable>
 
-        <Text style={styles.section}>タイムライン</Text>
-        <EventList events={events} nowMin={nowMin} onPress={openEdit} />
+        <View style={styles.sectionRow}>
+          <Text style={styles.section}>タイムライン</Text>
+          {events.length > 1 && (
+            <Pressable onPress={() => deleteEvents()} hitSlop={8}>
+              <Text style={styles.clearAll}>すべて消す</Text>
+            </Pressable>
+          )}
+        </View>
+        <EventList events={events} nowMin={nowMin} onPress={openEdit} onDelete={handleDelete} />
       </ScrollView>
 
-      {toast && (
+      {toast === 'saved' && (
         <View style={styles.toast}>
           <Text style={styles.toastText}>スケジュールを更新しました</Text>
           <Pressable onPress={startBriefing} hitSlop={8}>
             <Text style={styles.toastAction}>▶ 読み上げる</Text>
+          </Pressable>
+        </View>
+      )}
+      {toast === 'deleted' && undo && (
+        <View style={styles.toast}>
+          <Text style={[styles.toastText, { flex: 1 }]} numberOfLines={1}>
+            {undo.label}
+          </Text>
+          <Pressable onPress={undoDelete} hitSlop={8}>
+            <Text style={styles.toastAction}>元に戻す</Text>
           </Pressable>
         </View>
       )}
@@ -375,6 +413,8 @@ const styles = StyleSheet.create({
   playGlyph: { color: '#fff', fontSize: 16, marginLeft: 3 },
   briefTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
   briefSub: { color: colors.textSub, fontSize: 12, marginTop: 2 },
+  sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  clearAll: { color: colors.danger, fontSize: 12, fontWeight: '700' },
   section: { color: colors.textSub, fontSize: 12, letterSpacing: 2, marginTop: 26, marginBottom: 10, fontWeight: '700' },
   fab: {
     position: 'absolute',
