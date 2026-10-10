@@ -22,3 +22,20 @@ export function CalendarTabIcon({ color }: { color: string }) {
     </Svg>
   );
 }
+
+/** ナレーション設定（声の波形） */
+export function VoiceIcon({ color }: { color: string }) {
+  return (
+    <Svg width={22} height={22} viewBox="0 0 24 24">
+      {[
+        [4, 10, 14],
+        [8, 6, 18],
+        [12, 3, 21],
+        [16, 7, 17],
+        [20, 10, 14],
+      ].map(([x, y1, y2]) => (
+        <Line key={x} x1={x} y1={y1} x2={x} y2={y2} stroke={color} strokeWidth={2.2} strokeLinecap="round" />
+      ))}
+    </Svg>
+  );
+}

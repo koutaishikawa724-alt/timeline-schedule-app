@@ -7,6 +7,8 @@ Expo（React Native + TypeScript）製。iOS / Android / Web 共通コード。
 - 24時間のサークル型タイムスケジュール（現在時刻の針、重なりは内側の輪へ）
 - 月カレンダー（予定のある日に色ドット、タップでその日を表示）
 - ブリーフィング読み上げ：読み上げサーバーがあれば Claude が原稿を書き、OpenAI TTS の声で再生。無ければアプリ内テンプレート＋端末の日本語音声。読み上げ中の予定を円の上でハイライト
+- ナレーション設定（右上の波形ボタン）：呼びかける名前、語り口（ミッション／ラジオDJ／クール）、端末の声の選択、速さ・高さ、開始の効果音
+- 今日の途中で聞くと、終わった予定は件数だけ伝え、次の予定と「開始まであと何分」を読み上げ
 - 予定保存後に「▶ 読み上げる」のお知らせ
 - 端末内に自動保存（AsyncStorage）
 
@@ -40,4 +42,6 @@ APIを使わずに動作確認するには `BRIEFING_MOCK=1 MOCK_AUDIO=1 npx tsx
 - `src/components/EventEditor.tsx` 予定入力シート
 - `src/components/BriefingOverlay.tsx` 読み上げ画面
 - `src/briefing.ts` 読み上げ原稿（サーバー呼び出し／テンプレート）と再生
+- `src/components/SettingsSheet.tsx` ナレーション設定
+- `scripts/make-intro-sound.mjs` 効果音（assets/sounds/intro.wav）を合成するスクリプト
 - `server/src/index.ts` 読み上げサーバー（Claude で原稿、OpenAI TTS で音声）

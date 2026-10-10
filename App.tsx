@@ -7,7 +7,9 @@ import CalendarView from './src/components/CalendarView';
 import EventList from './src/components/EventList';
 import EventEditor from './src/components/EventEditor';
 import BriefingOverlay from './src/components/BriefingOverlay';
-import { CalendarTabIcon, CircleTabIcon } from './src/components/TabIcons';
+import { CalendarTabIcon, CircleTabIcon, VoiceIcon } from './src/components/TabIcons';
+import SettingsSheet from './src/components/SettingsSheet';
+import { defaultSettings, loadSettings, saveSettings, Settings } from './src/settings';
 import {
   aiBriefingEnabled,
   BriefingHandle,
@@ -45,6 +47,8 @@ function Main() {
   const [editing, setEditing] = useState<ScheduleEvent | undefined>();
   const [editorOpen, setEditorOpen] = useState(false);
   const [toast, setToast] = useState(false);
+  const [settings, setSettings] = useState<Settings>(defaultSettings);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [briefing, setBriefing] = useState<BriefingSegment[] | null>(null);
@@ -53,6 +57,7 @@ function Main() {
   const briefRun = useRef(0);
 
   useEffect(() => {
+    loadSettings().then(setSettings);
     loadSchedules().then((s) => {
       setSchedules(s);
       setLoaded(true);
@@ -110,13 +115,13 @@ function Main() {
     setBriefing([]); // 空 = 原稿を準備中
     const ai = await fetchAiBriefing(selectedKey, events, dayLabel);
     if (run !== briefRun.current) return; // 準備中に停止された
-    const segs = ai ?? buildBriefing(selectedKey, events, dayLabel);
+    const segs = ai ?? buildBriefing(selectedKey, events, dayLabel, { name: settings.name, style: settings.style });
     setBriefing(segs);
-    briefHandle.current = playBriefing(segs, setBriefIndex, () => {
+    briefHandle.current = playBriefing(segs, settings, setBriefIndex, () => {
       briefHandle.current = null;
       setBriefing(null);
     });
-  }, [selectedKey, events, dayLabel]);
+  }, [selectedKey, events, dayLabel, settings]);
 
   const stopBriefing = () => {
     briefRun.current++;
@@ -135,8 +140,15 @@ function Main() {
     <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>
       <StatusBar style="light" />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <Text style={styles.kicker}>{dayLabel ? (dayLabel === '今日' ? 'TODAY' : 'TOMORROW') : 'SCHEDULE'}</Text>
-        <Text style={styles.date}>{dateTitle}</Text>
+        <View style={styles.headerRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.kicker}>{dayLabel ? (dayLabel === '今日' ? 'TODAY' : 'TOMORROW') : 'SCHEDULE'}</Text>
+            <Text style={styles.date}>{dateTitle}</Text>
+          </View>
+          <Pressable onPress={() => setSettingsOpen(true)} style={styles.gear} hitSlop={8} accessibilityLabel="ナレーション設定">
+            <VoiceIcon color={colors.textSub} />
+          </Pressable>
+        </View>
 
         <View style={styles.segment}>
           {[
@@ -233,6 +245,16 @@ function Main() {
         onClose={() => setEditorOpen(false)}
       />
 
+      <SettingsSheet
+        visible={settingsOpen}
+        settings={settings}
+        onChange={(next) => {
+          setSettings(next);
+          saveSettings(next);
+        }}
+        onClose={() => setSettingsOpen(false)}
+      />
+
       <BriefingOverlay
         visible={briefing !== null}
         segments={briefing ?? []}
@@ -256,6 +278,17 @@ export default function App() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   scroll: { padding: 20, paddingBottom: 140, width: '100%', maxWidth: 560, alignSelf: 'center' },
+  headerRow: { flexDirection: 'row', alignItems: 'center' },
+  gear: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   kicker: { color: colors.accent, fontSize: 12, fontWeight: '700', letterSpacing: 5 },
   date: { color: colors.text, fontSize: 30, fontWeight: '800', marginTop: 4 },
   segment: {
