@@ -37,6 +37,7 @@ export default function BriefingOverlay({ visible, segments, index, events, titl
     Animated.timing(fade, { toValue: 1, duration: 350, useNativeDriver: true }).start();
   }, [index, fade]);
 
+  const preparing = segments.length === 0;
   const seg = segments[index];
   const ev = events.find((e) => e.id === seg?.eventId);
   const accent = ev?.color ?? colors.accent;
@@ -55,12 +56,14 @@ export default function BriefingOverlay({ visible, segments, index, events, titl
             events={events}
             size={280}
             highlightId={seg?.eventId}
-            centerTitle={ev ? formatTime(ev.start) : `${Math.min(index + 1, segments.length)}/${segments.length}`}
-            centerSub={ev ? ev.title : '読み上げ中'}
+            centerTitle={ev ? formatTime(ev.start) : preparing ? '…' : `${Math.min(index + 1, segments.length)}/${segments.length}`}
+            centerSub={ev ? ev.title : preparing ? '原稿を準備中' : '読み上げ中'}
           />
         </View>
 
-        <Animated.Text style={[styles.line, { opacity: fade }]}>{seg?.text ?? ''}</Animated.Text>
+        <Animated.Text style={[styles.line, { opacity: fade }, preparing && { color: colors.textSub }]}>
+          {preparing ? 'AI がブリーフィング原稿を書いています…' : (seg?.text ?? '')}
+        </Animated.Text>
 
         <View style={styles.progress}>
           {segments.map((_, i) => (

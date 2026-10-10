@@ -1,4 +1,5 @@
 import * as Speech from 'expo-speech';
+import { AudioPlayer, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { ScheduleEvent } from './types';
 import { fromKey, speakDuration, speakTime, weekday } from './date';
 
@@ -6,7 +7,48 @@ export type BriefingSegment = {
   text: string;
   /** この文で読み上げている予定（円グラフのハイライト用） */
   eventId?: string;
+  /** サーバーで作った高品質音声。無ければ端末の音声合成で読む */
+  audioUrl?: string;
 };
+
+const API_URL = process.env.EXPO_PUBLIC_BRIEFING_API_URL?.replace(/\/$/, '');
+const APP_TOKEN = process.env.EXPO_PUBLIC_BRIEFING_APP_TOKEN;
+
+export const aiBriefingEnabled = !!API_URL;
+
+/**
+ * 読み上げサーバーに原稿（と音声）を作ってもらう。
+ * サーバー未設定・失敗・タイムアウト時は null を返し、呼び出し側でテンプレート原稿に切り替える。
+ */
+export async function fetchAiBriefing(
+  key: string,
+  events: ScheduleEvent[],
+  dayLabel: '今日' | '明日' | null,
+): Promise<BriefingSegment[] | null> {
+  if (!API_URL) return null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30_000);
+  try {
+    const res = await fetch(`${API_URL}/briefing`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(APP_TOKEN ? { 'X-App-Token': APP_TOKEN } : {}) },
+      body: JSON.stringify({
+        date: key,
+        dayLabel,
+        events: events.map(({ id, title, start, end }) => ({ id, title, start, end })),
+      }),
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { segments?: { text: string; eventId: string | null; audioUrl?: string }[] };
+    if (!data.segments?.length) return null;
+    return data.segments.map((s) => ({ text: s.text, eventId: s.eventId ?? undefined, audioUrl: s.audioUrl }));
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 const pick = <T,>(list: T[]): T => list[Math.floor(Math.random() * list.length)];
 /** 同じ言い回しが続かないよう順番に使う */
@@ -131,17 +173,46 @@ export function playBriefing(
   onFinish: () => void,
 ): BriefingHandle {
   let cancelled = false;
+  let player: AudioPlayer | null = null;
+
+  const releasePlayer = () => {
+    player?.remove();
+    player = null;
+  };
 
   const speakAt = async (i: number) => {
+    releasePlayer();
     if (cancelled) return;
     if (i >= segments.length) {
       onFinish();
       return;
     }
     onSegment(i);
+    const seg = segments[i];
+
+    if (seg.audioUrl) {
+      try {
+        const p = createAudioPlayer({ uri: seg.audioUrl });
+        player = p;
+        let advanced = false;
+        const next = () => {
+          if (advanced || player !== p) return;
+          advanced = true;
+          void speakAt(i + 1);
+        };
+        p.addListener('playbackStatusUpdate', (status) => {
+          if (status.didJustFinish) next();
+        });
+        p.play();
+        return;
+      } catch {
+        // 再生できなければ端末の音声で読む
+      }
+    }
+
     const voice = await findJapaneseVoice();
     if (cancelled) return;
-    Speech.speak(segments[i].text, {
+    Speech.speak(seg.text, {
       language: 'ja-JP',
       voice,
       rate: 1.0,
@@ -151,11 +222,14 @@ export function playBriefing(
     });
   };
 
+  // iPhone のマナーモード中でも音を出す
+  setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
   Speech.stop().finally(() => speakAt(0));
 
   return {
     stop: () => {
       cancelled = true;
+      releasePlayer();
       Speech.stop();
       onFinish();
     },

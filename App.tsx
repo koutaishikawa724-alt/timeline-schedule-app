@@ -8,7 +8,14 @@ import EventList from './src/components/EventList';
 import EventEditor from './src/components/EventEditor';
 import BriefingOverlay from './src/components/BriefingOverlay';
 import { CalendarTabIcon, CircleTabIcon } from './src/components/TabIcons';
-import { BriefingHandle, BriefingSegment, buildBriefing, playBriefing } from './src/briefing';
+import {
+  aiBriefingEnabled,
+  BriefingHandle,
+  BriefingSegment,
+  buildBriefing,
+  fetchAiBriefing,
+  playBriefing,
+} from './src/briefing';
 import { addDays, dateKey, fromKey, nowMinutes, weekday } from './src/date';
 import { loadSchedules, saveSchedules } from './src/storage';
 import { ScheduleEvent, ScheduleMap } from './src/types';
@@ -43,6 +50,7 @@ function Main() {
   const [briefing, setBriefing] = useState<BriefingSegment[] | null>(null);
   const [briefIndex, setBriefIndex] = useState(0);
   const briefHandle = useRef<BriefingHandle | null>(null);
+  const briefRun = useRef(0);
 
   useEffect(() => {
     loadSchedules().then((s) => {
@@ -95,10 +103,14 @@ function Main() {
     setEditorOpen(false);
   };
 
-  const startBriefing = useCallback(() => {
+  const startBriefing = useCallback(async () => {
     setToast(false);
-    const segs = buildBriefing(selectedKey, events, dayLabel);
+    const run = ++briefRun.current;
     setBriefIndex(0);
+    setBriefing([]); // 空 = 原稿を準備中
+    const ai = await fetchAiBriefing(selectedKey, events, dayLabel);
+    if (run !== briefRun.current) return; // 準備中に停止された
+    const segs = ai ?? buildBriefing(selectedKey, events, dayLabel);
     setBriefing(segs);
     briefHandle.current = playBriefing(segs, setBriefIndex, () => {
       briefHandle.current = null;
@@ -107,6 +119,7 @@ function Main() {
   }, [selectedKey, events, dayLabel]);
 
   const stopBriefing = () => {
+    briefRun.current++;
     if (briefHandle.current) briefHandle.current.stop();
     else setBriefing(null);
   };
@@ -174,7 +187,7 @@ function Main() {
           <View style={{ flex: 1 }}>
             <Text style={styles.briefTitle}>ブリーフィングを聞く</Text>
             <Text style={styles.briefSub}>
-              {dayLabel ?? 'この日'}の予定 {events.length}件 をボイスで読み上げ
+              {dayLabel ?? 'この日'}の予定 {events.length}件 を{aiBriefingEnabled ? ' AI ナレーションで' : 'ボイスで'}読み上げ
             </Text>
           </View>
         </Pressable>
