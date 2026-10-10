@@ -19,6 +19,14 @@ npx expo start      # スマホの Expo Go で QR を読む
 npx expo start --web
 ```
 
+## iPhone のホーム画面で使う（無料・PC不要）
+Webアプリ版を Vercel（無料）で公開し、Safari の「ホーム画面に追加」でアイコンから全画面で開けます。
+1. Safari で vercel.com にアクセスし「Continue with GitHub」で登録（Hobby＝無料）
+2. 「Add New → Project」で `timeline-schedule-app` を Import（ビルド設定は `vercel.json` から自動）
+3. 「Deploy」→ できた `〜.vercel.app` を Safari で開き、共有ボタン →「ホーム画面に追加」
+
+予定や設定はそのiPhoneの中だけに保存されます。
+
 ## AI ナレーション（読み上げサーバー）
 APIキーはアプリに入れず、`server/` の小さなサーバーだけが持ちます。
 
