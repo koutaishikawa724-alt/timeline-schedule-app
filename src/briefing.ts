@@ -311,7 +311,7 @@ export function playBriefing(
 
   const start = () => {
     if (cancelled) return;
-    if (!voice.sound) return void speakAt(0);
+    if (!voice.sound || !INTRO_SOUND) return void speakAt(0);
     try {
       // 効果音が終わらない環境でも先に進めるよう、保険のタイマーも置く
       let started = false;
