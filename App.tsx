@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import CircleSchedule, { describeCenter } from './src/components/CircleSchedule';
+import CircleSchedule, { defaultHalf, describeCenter } from './src/components/CircleSchedule';
 import CalendarView from './src/components/CalendarView';
 import EventList from './src/components/EventList';
 import EventEditor from './src/components/EventEditor';
@@ -76,6 +76,15 @@ function Main() {
   const dateTitle = `${sel.getMonth() + 1}月${sel.getDate()}日（${weekday(sel)}）`;
   const nowMin = isToday ? nowMinutes(now) : undefined;
   const center = describeCenter(events, nowMin);
+
+  // 時計の文字盤は12時間ぶん。日付を切り替えたら、見るべき方（午前/午後）に合わせ直す
+  const [half, setHalf] = useState<0 | 1>(0);
+  const autoHalf = defaultHalf(events, nowMin);
+  useEffect(() => {
+    setHalf(autoHalf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedKey]);
+  const halfCounts = [0, 1].map((h) => events.filter((e) => e.end > h * 720 && e.start < (h + 1) * 720).length);
   const circleSize = Math.min(width - 40, 360);
 
   const openNew = () => {
@@ -189,7 +198,22 @@ function Main() {
               centerTitle={center.title}
               centerSub={center.sub}
               onPressEvent={openEdit}
+              half={half}
             />
+            <View style={styles.halfSwitch}>
+              {(['午前', '午後'] as const).map((label, h) => (
+                <Pressable
+                  key={label}
+                  onPress={() => setHalf(h as 0 | 1)}
+                  style={[styles.halfItem, half === h && styles.halfActive]}
+                >
+                  <Text style={[styles.halfText, half === h && styles.halfTextActive]}>
+                    {label}
+                    {halfCounts[h] ? `  ${halfCounts[h]}件` : ''}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
           </View>
         ) : (
           <View style={{ marginTop: 18 }}>
@@ -315,6 +339,20 @@ const styles = StyleSheet.create({
   segText: { color: colors.textMuted, fontSize: 15, fontWeight: '600' },
   segTextActive: { color: colors.text },
   circleWrap: { alignItems: 'center', marginTop: 18 },
+  halfSwitch: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 10,
+    padding: 4,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  halfItem: { paddingVertical: 7, paddingHorizontal: 18, borderRadius: 9 },
+  halfActive: { backgroundColor: colors.accent },
+  halfText: { color: colors.textMuted, fontSize: 13, fontWeight: '700' },
+  halfTextActive: { color: '#fff' },
   briefBtn: {
     flexDirection: 'row',
     alignItems: 'center',

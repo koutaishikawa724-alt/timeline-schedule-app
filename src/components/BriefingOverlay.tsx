@@ -3,7 +3,7 @@ import { Animated, Easing, Modal, Pressable, StyleSheet, Text, View } from 'reac
 import { BriefingSegment } from '../briefing';
 import { colors } from '../theme';
 import { ScheduleEvent } from '../types';
-import CircleSchedule from './CircleSchedule';
+import CircleSchedule, { defaultHalf } from './CircleSchedule';
 import { formatTime } from '../date';
 
 type Props = {
@@ -41,6 +41,10 @@ export default function BriefingOverlay({ visible, segments, index, events, titl
   const seg = segments[index];
   const ev = events.find((e) => e.id === seg?.eventId);
   const accent = ev?.color ?? colors.accent;
+  // 読んでいる予定の時間帯（午前/午後）の文字盤を出す。予定以外の文の間は直前のまま
+  const halfRef = useRef<0 | 1>(defaultHalf(events));
+  if (ev) halfRef.current = ev.start >= 720 ? 1 : 0;
+  else if (index === 0) halfRef.current = defaultHalf(events);
   const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
   const glow = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.15, 0.4] });
 
@@ -56,6 +60,7 @@ export default function BriefingOverlay({ visible, segments, index, events, titl
             events={events}
             size={280}
             highlightId={seg?.eventId}
+            half={halfRef.current}
             centerTitle={ev ? formatTime(ev.start) : preparing ? '…' : `${Math.min(index + 1, segments.length)}/${segments.length}`}
             centerSub={ev ? ev.title : preparing ? '原稿を準備中' : '読み上げ中'}
           />

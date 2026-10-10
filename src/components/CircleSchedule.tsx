@@ -14,19 +14,23 @@ type Props = {
   centerTitle: string;
   centerSub: string;
   onPressEvent?: (ev: ScheduleEvent) => void;
+  /** 時計の文字盤に出す半日（0 = 午前 0〜12時、1 = 午後 12〜24時） */
+  half: 0 | 1;
 };
 
-const DAY = 1440;
+/** 普通の時計と同じく、文字盤1周＝12時間 */
+const DIAL = 720;
 
+/** 0:00 からの分数を、文字盤上の角度にして座標を返す（12時が真上、3時が右） */
 function polar(cx: number, cy: number, r: number, min: number) {
-  const a = (min / DAY) * Math.PI * 2 - Math.PI / 2;
+  const a = (min / DIAL) * Math.PI * 2 - Math.PI / 2;
   return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
 }
 
 function arcPath(cx: number, cy: number, rOuter: number, rInner: number, start: number, end: number) {
-  const span = Math.min(end - start, DAY - 0.01);
+  const span = Math.min(end - start, DIAL - 0.01);
   const e = start + span;
-  const large = span > DAY / 2 ? 1 : 0;
+  const large = span > DIAL / 2 ? 1 : 0;
   const o1 = polar(cx, cy, rOuter, start);
   const o2 = polar(cx, cy, rOuter, e);
   const i1 = polar(cx, cy, rInner, e);
@@ -64,15 +68,27 @@ export default function CircleSchedule({
   centerTitle,
   centerSub,
   onPressEvent,
+  half,
 }: Props) {
   const c = size / 2;
+  const from = half * DIAL;
+  const to = from + DIAL;
+  // この半日にかかる予定だけを、半日の範囲に切り取って描く
+  const visible = useMemo(
+    () =>
+      events
+        .filter((e) => e.end > from && e.start < to)
+        .map((e) => ({ ...e, start: Math.max(e.start, from), end: Math.min(e.end, to) })),
+    [events, from, to],
+  );
+  const nowOnDial = nowMin !== undefined && nowMin >= from && nowMin < to ? nowMin : undefined;
   const ringOuter = c - 26;
   const ringWidth = size * 0.11;
-  const laned = useMemo(() => assignLanes(events), [events]);
+  const laned = useMemo(() => assignLanes(visible), [visible]);
   const laneCount = Math.max(1, ...laned.map((l) => l.lane + 1));
   const laneWidth = ringWidth / Math.min(laneCount, 3);
 
-  const ticks = Array.from({ length: 96 }, (_, i) => i * 15);
+  const ticks = Array.from({ length: 60 }, (_, i) => i * 12);
 
   return (
     <View style={{ width: size, height: size }}>
@@ -83,7 +99,7 @@ export default function CircleSchedule({
 
         {/* 目盛り */}
         {ticks.map((m) => {
-          const major = m % 360 === 0;
+          const major = m % 180 === 0;
           const hour = m % 60 === 0;
           const r1 = ringOuter + 4;
           const r2 = ringOuter + (major ? 12 : hour ? 8 : 5);
@@ -101,26 +117,38 @@ export default function CircleSchedule({
             />
           );
         })}
-        {[0, 3, 6, 9, 12, 15, 18, 21].map((h) => {
-          const p = polar(c, c, ringOuter - ringWidth - 24, h * 60);
+        {[12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((h, i) => {
+          const main = h % 3 === 0;
+          const p = polar(c, c, ringOuter - ringWidth - 24, i * 60);
           return (
             <SvgText
               key={h}
               x={p.x}
               y={p.y + 4}
-              fontSize={h % 6 === 0 ? 13 : 10}
-              fontWeight={h % 6 === 0 ? '700' : '400'}
-              fill={h % 6 === 0 ? colors.textSub : colors.textMuted}
+              fontSize={main ? 14 : 10}
+              fontWeight={main ? '700' : '400'}
+              fill={main ? colors.textSub : colors.textMuted}
               textAnchor="middle"
             >
               {h}
             </SvgText>
           );
         })}
+        <SvgText
+          x={c}
+          y={c - (ringOuter - ringWidth - 24) + 20}
+          fontSize={9}
+          fontWeight="700"
+          fill={colors.accent}
+          textAnchor="middle"
+          letterSpacing={2}
+        >
+          {half === 0 ? 'AM' : 'PM'}
+        </SvgText>
 
         {/* 経過した時間をうっすら暗く */}
-        {nowMin !== undefined && nowMin > 0 && (
-          <Path d={arcPath(c, c, ringOuter, ringOuter - ringWidth, 0, nowMin)} fill="rgba(0,0,0,0.35)" />
+        {nowMin !== undefined && nowMin > from && (
+          <Path d={arcPath(c, c, ringOuter, ringOuter - ringWidth, from, Math.min(nowMin, to))} fill="rgba(0,0,0,0.35)" />
         )}
 
         {/* 予定の弧 */}
@@ -138,27 +166,27 @@ export default function CircleSchedule({
               <Path
                 d={arcPath(c, c, rO, rI, ev.start, ev.end)}
                 fill={ev.color}
-                onPress={onPressEvent ? () => onPressEvent(ev) : undefined}
+                onPress={onPressEvent ? () => onPressEvent(events.find((e) => e.id === ev.id) ?? ev) : undefined}
               />
             </G>
           );
         })}
 
         {/* 現在時刻の針 */}
-        {nowMin !== undefined && (
+        {nowOnDial !== undefined && (
           <G>
             <Line
-              x1={polar(c, c, ringOuter - ringWidth - 8, nowMin).x}
-              y1={polar(c, c, ringOuter - ringWidth - 8, nowMin).y}
-              x2={polar(c, c, ringOuter + 10, nowMin).x}
-              y2={polar(c, c, ringOuter + 10, nowMin).y}
+              x1={polar(c, c, ringOuter - ringWidth - 8, nowOnDial).x}
+              y1={polar(c, c, ringOuter - ringWidth - 8, nowOnDial).y}
+              x2={polar(c, c, ringOuter + 10, nowOnDial).x}
+              y2={polar(c, c, ringOuter + 10, nowOnDial).y}
               stroke={colors.text}
               strokeWidth={2.5}
               strokeLinecap="round"
             />
             <Circle
-              cx={polar(c, c, ringOuter + 12, nowMin).x}
-              cy={polar(c, c, ringOuter + 12, nowMin).y}
+              cx={polar(c, c, ringOuter + 12, nowOnDial).x}
+              cy={polar(c, c, ringOuter + 12, nowOnDial).y}
               r={4}
               fill={colors.text}
             />
@@ -202,3 +230,10 @@ const styles = StyleSheet.create({
   centerTitle: { color: colors.text, fontSize: 34, fontWeight: '200', letterSpacing: 1 },
   centerSub: { color: colors.textSub, fontSize: 12, marginTop: 4, textAlign: 'center' },
 });
+
+/** 最初に見せる半日：今日なら今の時間帯、それ以外は最初の予定がある方 */
+export function defaultHalf(events: ScheduleEvent[], nowMin?: number): 0 | 1 {
+  if (nowMin !== undefined) return nowMin < 720 ? 0 : 1;
+  const first = [...events].sort((a, b) => a.start - b.start)[0];
+  return first && first.start >= 720 ? 1 : 0;
+}
