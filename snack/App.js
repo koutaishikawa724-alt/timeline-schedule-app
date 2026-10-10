@@ -13,6 +13,13 @@ var require_intro = __commonJS({
   }
 });
 
+// wav:../assets/sounds/bgm.wav
+var require_bgm = __commonJS({
+  "wav:../assets/sounds/bgm.wav"(exports, module) {
+    module.exports = null;
+  }
+});
+
 // ../../../../../../home/claude/schedule-app/App.tsx
 import { useCallback, useEffect as useEffect4, useMemo as useMemo2, useRef as useRef2, useState as useState4 } from "react";
 import { Pressable as Pressable6, ScrollView as ScrollView3, StyleSheet as StyleSheet7, Text as Text7, useWindowDimensions, View as View7 } from "react-native";
@@ -611,7 +618,18 @@ import { Modal as Modal3, Platform as Platform2, Pressable as Pressable5, Scroll
 
 // ../../../../../../home/claude/schedule-app/src/settings.ts
 import AsyncStorage from "@react-native-async-storage/async-storage";
-var defaultSettings = { name: "", style: "mission", rate: 1, pitch: 0.92, sound: true };
+var RATE_OPTIONS = [
+  { value: 0.85, label: "ゆっくり" },
+  { value: 0.95, label: "ふつう" },
+  { value: 1.1, label: "はやい" }
+];
+var PITCH_OPTIONS = [
+  { value: 0.78, label: "低め" },
+  { value: 0.9, label: "ふつう" },
+  { value: 1.05, label: "高め" }
+];
+var snap = (value, options) => options.reduce((best, o) => Math.abs(o.value - value) < Math.abs(best - value) ? o.value : best, options[0].value);
+var defaultSettings = { name: "", style: "mission", rate: 0.95, pitch: 0.9, sound: true, bgm: true };
 var STYLE_LABELS = {
   mission: { label: "ミッション", desc: "作戦会議風" },
   dj: { label: "ラジオDJ", desc: "明るく軽快" },
@@ -621,7 +639,9 @@ var KEY = "settings.v1";
 async function loadSettings() {
   try {
     const raw = await AsyncStorage.getItem(KEY);
-    return raw ? { ...defaultSettings, ...JSON.parse(raw) } : defaultSettings;
+    if (!raw) return defaultSettings;
+    const s = { ...defaultSettings, ...JSON.parse(raw) };
+    return { ...s, rate: snap(s.rate, RATE_OPTIONS), pitch: snap(s.pitch, PITCH_OPTIONS) };
   } catch {
     return defaultSettings;
   }
@@ -776,13 +796,31 @@ function buildBriefing(key, events, dayLabel, opts = {}, now = /* @__PURE__ */ n
   return segs;
 }
 var INTRO_SOUND = require_intro();
+var BGM = require_bgm();
+var GAP_MS = 380;
+var BGM_VOLUME = 0.22;
+function voiceScore(v) {
+  const label = `${v.name} ${v.identifier}`;
+  let score = 0;
+  if (/premium|プレミアム/i.test(label)) score += 6;
+  if (v.quality === Speech.VoiceQuality.Enhanced || /enhanced|拡張|高品質/i.test(label)) score += 4;
+  if (/otoya|hattori|男性|male/i.test(label) && !/female/i.test(label)) score += 2;
+  if (/google/i.test(label)) score += 1;
+  if (/compact|eloquence|novelty/i.test(label)) score -= 3;
+  return score;
+}
 async function listJapaneseVoices() {
   try {
     const voices = await Promise.race([
       Speech.getAvailableVoicesAsync(),
       new Promise((resolve) => setTimeout(() => resolve([]), 1500))
     ]);
-    return voices.filter((v) => v.language?.toLowerCase().replace("_", "-").startsWith("ja")).map((v) => ({ id: v.identifier, name: v.name, enhanced: v.quality === Speech.VoiceQuality.Enhanced })).sort((a, b) => Number(b.enhanced) - Number(a.enhanced) || a.name.localeCompare(b.name));
+    return voices.filter((v) => v.language?.toLowerCase().replace("_", "-").startsWith("ja")).map((v) => ({
+      id: v.identifier,
+      name: v.name,
+      enhanced: v.quality === Speech.VoiceQuality.Enhanced || /premium|enhanced|プレミアム|拡張|高品質/i.test(`${v.name} ${v.identifier}`),
+      score: voiceScore(v)
+    })).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name)).map(({ score: _score, ...v }) => v);
   } catch {
     return [];
   }
@@ -816,22 +854,56 @@ async function previewVoice(text, voice) {
 function playBriefing(segments, voice, onSegment, onFinish) {
   let cancelled = false;
   let player = null;
+  let bgm = null;
+  let gapTimer = null;
   const releasePlayer = () => {
     player?.remove();
     player = null;
+  };
+  const startBgm = () => {
+    if (!voice.bgm || !BGM || bgm) return;
+    try {
+      bgm = createAudioPlayer(BGM);
+      bgm.loop = true;
+      bgm.volume = BGM_VOLUME;
+      bgm.play();
+    } catch {
+      bgm = null;
+    }
+  };
+  const stopBgm = (fade) => {
+    const p = bgm;
+    bgm = null;
+    if (!p) return;
+    if (!fade) return p.remove();
+    let v = BGM_VOLUME;
+    const t = setInterval(() => {
+      v -= BGM_VOLUME / 12;
+      if (v <= 0) {
+        clearInterval(t);
+        p.remove();
+      } else {
+        p.volume = v;
+      }
+    }, 100);
+  };
+  const nextAfterGap = (i) => {
+    gapTimer = setTimeout(() => void speakAt(i), GAP_MS);
   };
   const speakAt = async (i) => {
     releasePlayer();
     if (cancelled) return;
     if (i >= segments.length) {
+      stopBgm(true);
       onFinish();
       return;
     }
+    if (i === 0) startBgm();
     onSegment(i);
     const seg = segments[i];
     if (seg.audioUrl) {
       try {
-        player = playSource({ uri: seg.audioUrl }, () => void speakAt(i + 1));
+        player = playSource({ uri: seg.audioUrl }, () => nextAfterGap(i + 1));
         return;
       } catch {
       }
@@ -843,8 +915,8 @@ function playBriefing(segments, voice, onSegment, onFinish) {
       voice: voiceId,
       rate: voice.rate,
       pitch: voice.pitch,
-      onDone: () => void speakAt(i + 1),
-      onError: () => void speakAt(i + 1)
+      onDone: () => nextAfterGap(i + 1),
+      onError: () => nextAfterGap(i + 1)
     });
   };
   const start = () => {
@@ -869,7 +941,9 @@ function playBriefing(segments, voice, onSegment, onFinish) {
   return {
     stop: () => {
       cancelled = true;
+      if (gapTimer) clearTimeout(gapTimer);
       releasePlayer();
+      stopBgm(false);
       Speech.stop();
       onFinish();
     }
@@ -878,16 +952,8 @@ function playBriefing(segments, voice, onSegment, onFinish) {
 
 // ../../../../../../home/claude/schedule-app/src/components/SettingsSheet.tsx
 import { jsx as jsx7, jsxs as jsxs7 } from "react/jsx-runtime";
-var RATES = [
-  { value: 0.85, label: "ゆっくり" },
-  { value: 1, label: "ふつう" },
-  { value: 1.15, label: "はやい" }
-];
-var PITCHES = [
-  { value: 0.8, label: "低め" },
-  { value: 0.92, label: "ふつう" },
-  { value: 1.05, label: "高め" }
-];
+var RATES = RATE_OPTIONS;
+var PITCHES = PITCH_OPTIONS;
 var STYLE_SAMPLE = {
   mission: "これより、本日の作戦概要をお伝えします。",
   dj: "さあ始まりました、本日のスケジュール・カウントダウン！",
@@ -988,6 +1054,21 @@ function SettingsSheet({ visible, settings, onChange, onClose }) {
             {
               value: settings.sound,
               onValueChange: (sound) => set({ sound }),
+              trackColor: { true: colors.accent, false: colors.surfaceHigh },
+              thumbColor: "#fff"
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsxs7(View6, { style: styles6.switchRow, children: [
+          /* @__PURE__ */ jsxs7(View6, { style: { flex: 1 }, children: [
+            /* @__PURE__ */ jsx7(Text6, { style: styles6.switchLabel, children: "BGM" }),
+            /* @__PURE__ */ jsx7(Text6, { style: styles6.note, children: "読み上げ中に低いビートを小さく流します" })
+          ] }),
+          /* @__PURE__ */ jsx7(
+            Switch,
+            {
+              value: settings.bgm,
+              onValueChange: (bgm) => set({ bgm }),
               trackColor: { true: colors.accent, false: colors.surfaceHigh },
               thumbColor: "#fff"
             }

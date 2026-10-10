@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { colors } from '../theme';
-import { NarrationStyle, Settings, STYLE_LABELS } from '../settings';
+import { NarrationStyle, PITCH_OPTIONS, RATE_OPTIONS, Settings, STYLE_LABELS } from '../settings';
 import { listJapaneseVoices, previewVoice, VoiceOption } from '../briefing';
 
 type Props = {
@@ -11,16 +11,8 @@ type Props = {
   onClose: () => void;
 };
 
-const RATES = [
-  { value: 0.85, label: 'ゆっくり' },
-  { value: 1.0, label: 'ふつう' },
-  { value: 1.15, label: 'はやい' },
-];
-const PITCHES = [
-  { value: 0.8, label: '低め' },
-  { value: 0.92, label: 'ふつう' },
-  { value: 1.05, label: '高め' },
-];
+const RATES = RATE_OPTIONS;
+const PITCHES = PITCH_OPTIONS;
 
 const STYLE_SAMPLE: Record<NarrationStyle, string> = {
   mission: 'これより、本日の作戦概要をお伝えします。',
@@ -146,6 +138,19 @@ export default function SettingsSheet({ visible, settings, onChange, onClose }: 
               <Switch
                 value={settings.sound}
                 onValueChange={(sound) => set({ sound })}
+                trackColor={{ true: colors.accent, false: colors.surfaceHigh }}
+                thumbColor="#fff"
+              />
+            </View>
+
+            <View style={styles.switchRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.switchLabel}>BGM</Text>
+                <Text style={styles.note}>読み上げ中に低いビートを小さく流します</Text>
+              </View>
+              <Switch
+                value={settings.bgm}
+                onValueChange={(bgm) => set({ bgm })}
                 trackColor={{ true: colors.accent, false: colors.surfaceHigh }}
                 thumbColor="#fff"
               />

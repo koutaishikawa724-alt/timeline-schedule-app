@@ -207,10 +207,29 @@ export function buildBriefing(
 }
 
 const INTRO_SOUND = require('../assets/sounds/intro.wav');
+const BGM = require('../assets/sounds/bgm.wav');
+/** 文と文の間の「ため」 */
+const GAP_MS = 380;
+const BGM_VOLUME = 0.22;
 
 export type VoiceOption = { id: string; name: string; enhanced: boolean };
 
-/** 端末に入っている日本語の声の一覧（高品質なものを先頭に） */
+/**
+ * 声の良さの目安。名前やIDに含まれる品質の印（Premium / Enhanced）を最優先し、
+ * 次にブリーフィングに合う落ち着いた男性の声（Otoya、Hattori）を選ぶ。
+ */
+function voiceScore(v: Speech.Voice): number {
+  const label = `${v.name} ${v.identifier}`;
+  let score = 0;
+  if (/premium|プレミアム/i.test(label)) score += 6;
+  if (v.quality === Speech.VoiceQuality.Enhanced || /enhanced|拡張|高品質/i.test(label)) score += 4;
+  if (/otoya|hattori|男性|male/i.test(label) && !/female/i.test(label)) score += 2;
+  if (/google/i.test(label)) score += 1;
+  if (/compact|eloquence|novelty/i.test(label)) score -= 3;
+  return score;
+}
+
+/** 端末に入っている日本語の声の一覧（良い声を先頭に） */
 export async function listJapaneseVoices(): Promise<VoiceOption[]> {
   try {
     // 音声一覧が返ってこない端末・ブラウザでも止まらないよう、1.5秒で諦める
@@ -220,8 +239,14 @@ export async function listJapaneseVoices(): Promise<VoiceOption[]> {
     ]);
     return voices
       .filter((v) => v.language?.toLowerCase().replace('_', '-').startsWith('ja'))
-      .map((v) => ({ id: v.identifier, name: v.name, enhanced: v.quality === Speech.VoiceQuality.Enhanced }))
-      .sort((a, b) => Number(b.enhanced) - Number(a.enhanced) || a.name.localeCompare(b.name));
+      .map((v) => ({
+        id: v.identifier,
+        name: v.name,
+        enhanced: v.quality === Speech.VoiceQuality.Enhanced || /premium|enhanced|プレミアム|拡張|高品質/i.test(`${v.name} ${v.identifier}`),
+        score: voiceScore(v),
+      }))
+      .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
+      .map(({ score: _score, ...v }) => v);
   } catch {
     return [];
   }
@@ -239,7 +264,7 @@ async function resolveVoice(voiceId?: string): Promise<string | undefined> {
   return autoVoice;
 }
 
-export type VoiceSettings = { voiceId?: string; rate: number; pitch: number; sound: boolean };
+export type VoiceSettings = { voiceId?: string; rate: number; pitch: number; sound: boolean; bgm?: boolean };
 
 /** 音源を1回鳴らし、終わったら onDone。止めるための player を返す */
 function playSource(source: Parameters<typeof createAudioPlayer>[0], onDone: () => void): AudioPlayer {
@@ -272,25 +297,63 @@ export function playBriefing(
 ): BriefingHandle {
   let cancelled = false;
   let player: AudioPlayer | null = null;
+  let bgm: AudioPlayer | null = null;
+  let gapTimer: ReturnType<typeof setTimeout> | null = null;
 
   const releasePlayer = () => {
     player?.remove();
     player = null;
   };
 
+  const startBgm = () => {
+    if (!voice.bgm || !BGM || bgm) return;
+    try {
+      bgm = createAudioPlayer(BGM);
+      bgm.loop = true;
+      bgm.volume = BGM_VOLUME;
+      bgm.play();
+    } catch {
+      bgm = null;
+    }
+  };
+
+  /** BGMを少しずつ小さくして止める */
+  const stopBgm = (fade: boolean) => {
+    const p = bgm;
+    bgm = null;
+    if (!p) return;
+    if (!fade) return p.remove();
+    let v = BGM_VOLUME;
+    const t = setInterval(() => {
+      v -= BGM_VOLUME / 12;
+      if (v <= 0) {
+        clearInterval(t);
+        p.remove();
+      } else {
+        p.volume = v;
+      }
+    }, 100);
+  };
+
+  const nextAfterGap = (i: number) => {
+    gapTimer = setTimeout(() => void speakAt(i), GAP_MS);
+  };
+
   const speakAt = async (i: number) => {
     releasePlayer();
     if (cancelled) return;
     if (i >= segments.length) {
+      stopBgm(true);
       onFinish();
       return;
     }
+    if (i === 0) startBgm();
     onSegment(i);
     const seg = segments[i];
 
     if (seg.audioUrl) {
       try {
-        player = playSource({ uri: seg.audioUrl }, () => void speakAt(i + 1));
+        player = playSource({ uri: seg.audioUrl }, () => nextAfterGap(i + 1));
         return;
       } catch {
         // 再生できなければ端末の音声で読む
@@ -304,8 +367,8 @@ export function playBriefing(
       voice: voiceId,
       rate: voice.rate,
       pitch: voice.pitch,
-      onDone: () => void speakAt(i + 1),
-      onError: () => void speakAt(i + 1),
+      onDone: () => nextAfterGap(i + 1),
+      onError: () => nextAfterGap(i + 1),
     });
   };
 
@@ -334,7 +397,9 @@ export function playBriefing(
   return {
     stop: () => {
       cancelled = true;
+      if (gapTimer) clearTimeout(gapTimer);
       releasePlayer();
+      stopBgm(false);
       Speech.stop();
       onFinish();
     },
