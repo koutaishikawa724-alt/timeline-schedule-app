@@ -1,10 +1,13 @@
 // Timeline（スケジュールアプリ）Expo Snack 用 1ファイル版
 // snack.expo.dev の App.js をすべて消して、これを貼り付けてください。
 
+var __defProp = Object.defineProperty;
 var __getOwnPropNames = Object.getOwnPropertyNames;
+var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __commonJS = (cb, mod) => function __require() {
   return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
+var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 
 // wav:../assets/sounds/intro.wav
 var require_intro = __commonJS({
@@ -702,7 +705,7 @@ function VoiceIcon({ color }) {
 
 // ../../../../../../home/claude/schedule-app/src/components/SettingsSheet.tsx
 import { useEffect as useEffect3, useState as useState3 } from "react";
-import { Modal as Modal3, Platform as Platform3, Pressable as Pressable5, ScrollView as ScrollView2, StyleSheet as StyleSheet6, Switch, Text as Text6, TextInput as TextInput2, View as View6 } from "react-native";
+import { Keyboard as Keyboard2, KeyboardAvoidingView as KeyboardAvoidingView2, Modal as Modal3, Platform as Platform3, Pressable as Pressable5, ScrollView as ScrollView2, StyleSheet as StyleSheet6, Switch, Text as Text6, TextInput as TextInput2, View as View6 } from "react-native";
 
 // ../../../../../../home/claude/schedule-app/src/settings.ts
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -726,10 +729,31 @@ var ElevenError = class extends Error {
   constructor(message, status) {
     super(message);
     this.status = status;
+    /** ElevenLabs が返す理由（invalid_api_key, missing_permissions, quota_exceeded など） */
+    __publicField(this, "code");
+    let code = "";
+    try {
+      const detail = JSON.parse(message)?.detail;
+      code = typeof detail?.status === "string" ? detail.status : "";
+    } catch {
+    }
+    this.code = code;
   }
 };
+async function fetchWithTimeout(url, init, ms) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } catch (e) {
+    if (ctrl.signal.aborted) throw new ElevenError("timeout", 0);
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 async function getElevenQuota(apiKey) {
-  const res = await fetch(`${API}/user/subscription`, { headers: { "xi-api-key": apiKey } });
+  const res = await fetchWithTimeout(`${API}/user/subscription`, { headers: { "xi-api-key": apiKey } }, 15e3);
   if (!res.ok) throw new ElevenError(await res.text(), res.status);
   const data = await res.json();
   return { used: data.character_count, limit: data.character_limit };
@@ -749,7 +773,7 @@ async function synthesizeEleven(text, apiKey, voiceId) {
     memoryCache.set(key, file.uri);
     return file.uri;
   }
-  const res = await fetch(`${API}/text-to-speech/${voiceId}?output_format=mp3_44100_128`, {
+  const res = await fetchWithTimeout(`${API}/text-to-speech/${voiceId}?output_format=mp3_44100_128`, {
     method: "POST",
     headers: { "xi-api-key": apiKey, "Content-Type": "application/json", Accept: "audio/mpeg" },
     body: JSON.stringify({
@@ -758,7 +782,7 @@ async function synthesizeEleven(text, apiKey, voiceId) {
       language_code: "ja",
       voice_settings: { stability: 0.45, similarity_boost: 0.8, style: 0.35, use_speaker_boost: true }
     })
-  });
+  }, 3e4);
   if (!res.ok) throw new ElevenError(await res.text(), res.status);
   let uri;
   if (file) {
@@ -1174,15 +1198,25 @@ function SettingsSheet({ visible, settings, onChange, onClose }) {
   const checkEleven = async () => {
     const key = settings.elevenKey.trim();
     if (!key) return setElevenStatus("APIキーを入力してください");
+    Keyboard2.dismiss();
     setElevenStatus("確認中…");
     try {
       const q = await getElevenQuota(key);
       setElevenStatus(`接続OK。今月の残り：${Math.max(0, q.limit - q.used).toLocaleString()}文字（1回の読み上げで約300文字）`);
     } catch (e) {
-      setElevenStatus(describeElevenError(e));
+      if (e instanceof ElevenError && e.code === "missing_permissions") {
+        try {
+          await previewEleven("接続できました。", key, settings.elevenVoice);
+          setElevenStatus("接続OK。下から好きな声を選んでください。");
+        } catch (e2) {
+          setElevenStatus(describeElevenError(e2));
+        }
+      } else {
+        setElevenStatus(describeElevenError(e));
+      }
     }
   };
-  return /* @__PURE__ */ jsx7(Modal3, { visible, transparent: true, animationType: "slide", onRequestClose: onClose, children: /* @__PURE__ */ jsxs7(View6, { style: styles6.backdrop, children: [
+  return /* @__PURE__ */ jsx7(Modal3, { visible, transparent: true, animationType: "slide", onRequestClose: onClose, children: /* @__PURE__ */ jsxs7(KeyboardAvoidingView2, { behavior: Platform3.OS === "ios" ? "padding" : void 0, style: styles6.backdrop, children: [
     /* @__PURE__ */ jsx7(Pressable5, { style: StyleSheet6.absoluteFill, onPress: onClose }),
     /* @__PURE__ */ jsxs7(View6, { style: styles6.sheet, children: [
       /* @__PURE__ */ jsx7(View6, { style: styles6.grabber }),
@@ -1190,141 +1224,155 @@ function SettingsSheet({ visible, settings, onChange, onClose }) {
         /* @__PURE__ */ jsx7(Text6, { style: styles6.heading, children: "ナレーション設定" }),
         /* @__PURE__ */ jsx7(Pressable5, { onPress: onClose, hitSlop: 10, children: /* @__PURE__ */ jsx7(Text6, { style: styles6.done, children: "完了" }) })
       ] }),
-      /* @__PURE__ */ jsxs7(ScrollView2, { showsVerticalScrollIndicator: false, contentContainerStyle: { paddingBottom: 12 }, children: [
-        /* @__PURE__ */ jsx7(Text6, { style: styles6.label, children: "呼びかける名前" }),
-        /* @__PURE__ */ jsx7(
-          TextInput2,
-          {
-            value: settings.name,
-            onChangeText: (name) => set({ name }),
-            placeholder: "例：こうた（「こうたさん」と呼びます）",
-            placeholderTextColor: colors.textMuted,
-            style: styles6.input,
-            maxLength: 12
-          }
-        ),
-        /* @__PURE__ */ jsx7(Text6, { style: styles6.label, children: "語り口" }),
-        /* @__PURE__ */ jsx7(View6, { style: styles6.row, children: Object.keys(STYLE_LABELS).map((k) => /* @__PURE__ */ jsx7(
-          Chip2,
-          {
-            label: STYLE_LABELS[k].label,
-            sub: STYLE_LABELS[k].desc,
-            active: settings.style === k,
-            onPress: () => {
-              const next = { ...settings, style: k };
-              onChange(next);
-              sample(next);
-            }
-          },
-          k
-        )) }),
-        /* @__PURE__ */ jsx7(Text6, { style: styles6.label, children: "AIボイス（ElevenLabs）" }),
-        /* @__PURE__ */ jsx7(
-          TextInput2,
-          {
-            value: settings.elevenKey,
-            onChangeText: (elevenKey) => set({ elevenKey }),
-            placeholder: "APIキーを貼り付け（空なら端末の声）",
-            placeholderTextColor: colors.textMuted,
-            style: styles6.input,
-            autoCapitalize: "none",
-            autoCorrect: false,
-            secureTextEntry: true
-          }
-        ),
-        /* @__PURE__ */ jsx7(View6, { style: [styles6.row, { marginTop: 8 }], children: /* @__PURE__ */ jsx7(Pressable5, { onPress: checkEleven, style: [styles6.chip, { flexGrow: 0, flexBasis: "auto", paddingHorizontal: 16 }], children: /* @__PURE__ */ jsx7(Text6, { style: styles6.chipText, children: "接続を確認" }) }) }),
-        elevenStatus ? /* @__PURE__ */ jsx7(Text6, { style: [styles6.note, { color: colors.text }], children: elevenStatus }) : null,
-        settings.elevenKey.trim() ? /* @__PURE__ */ jsx7(View6, { style: [styles6.voiceList, { marginTop: 10 }], children: ELEVEN_VOICES.map((v) => /* @__PURE__ */ jsx7(
-          VoiceRow,
-          {
-            name: v.name,
-            sub: v.desc,
-            active: settings.elevenVoice === v.id,
-            onPress: () => {
-              const next = { ...settings, elevenVoice: v.id };
-              onChange(next);
-              sample(next);
-            }
-          },
-          v.id
-        )) }) : null,
-        /* @__PURE__ */ jsx7(Text6, { style: styles6.note, children: "elevenlabs.io で無料登録 → 左下のメニュー →「Developers」→「API Keys」でキーを作成して貼り付けます。キーはこのスマホの中だけに保存されます。" }),
-        /* @__PURE__ */ jsx7(Text6, { style: styles6.label, children: "端末の声（AIボイス未設定のとき）" }),
-        /* @__PURE__ */ jsxs7(View6, { style: styles6.voiceList, children: [
-          /* @__PURE__ */ jsx7(
-            VoiceRow,
-            {
-              name: "おまかせ",
-              sub: "一番良い日本語の声を自動で選びます",
-              active: !settings.voiceId,
-              onPress: () => {
-                const next = { ...settings, voiceId: void 0 };
-                onChange(next);
-                sample(next);
+      /* @__PURE__ */ jsxs7(
+        ScrollView2,
+        {
+          showsVerticalScrollIndicator: false,
+          contentContainerStyle: { paddingBottom: 12 },
+          keyboardShouldPersistTaps: "handled",
+          children: [
+            /* @__PURE__ */ jsx7(Text6, { style: styles6.label, children: "呼びかける名前" }),
+            /* @__PURE__ */ jsx7(
+              TextInput2,
+              {
+                value: settings.name,
+                onChangeText: (name) => set({ name }),
+                placeholder: "例：こうた（「こうたさん」と呼びます）",
+                placeholderTextColor: colors.textMuted,
+                style: styles6.input,
+                maxLength: 12
               }
-            }
-          ),
-          (voices ?? []).map((v) => /* @__PURE__ */ jsx7(
-            VoiceRow,
-            {
-              name: v.name,
-              sub: v.enhanced ? "高品質" : void 0,
-              active: settings.voiceId === v.id,
-              onPress: () => {
-                const next = { ...settings, voiceId: v.id };
-                onChange(next);
-                sample(next);
+            ),
+            /* @__PURE__ */ jsx7(Text6, { style: styles6.label, children: "語り口" }),
+            /* @__PURE__ */ jsx7(View6, { style: styles6.row, children: Object.keys(STYLE_LABELS).map((k) => /* @__PURE__ */ jsx7(
+              Chip2,
+              {
+                label: STYLE_LABELS[k].label,
+                sub: STYLE_LABELS[k].desc,
+                active: settings.style === k,
+                onPress: () => {
+                  const next = { ...settings, style: k };
+                  onChange(next);
+                  sample(next);
+                }
+              },
+              k
+            )) }),
+            /* @__PURE__ */ jsx7(Text6, { style: styles6.label, children: "AIボイス（ElevenLabs）" }),
+            /* @__PURE__ */ jsx7(
+              TextInput2,
+              {
+                value: settings.elevenKey,
+                onChangeText: (elevenKey) => set({ elevenKey }),
+                placeholder: "APIキーを貼り付け（空なら端末の声）",
+                placeholderTextColor: colors.textMuted,
+                style: styles6.input,
+                autoCapitalize: "none",
+                autoCorrect: false,
+                secureTextEntry: true
               }
-            },
-            v.id
-          )),
-          voices !== null && voices.length === 0 && /* @__PURE__ */ jsx7(Text6, { style: styles6.note, children: "この端末では日本語の声の一覧を取得できませんでした。" })
-        ] }),
-        /* @__PURE__ */ jsx7(Text6, { style: styles6.note, children: Platform3.OS === "android" ? "ヒント：設定 → システム → 言語と入力 → テキスト読み上げ で、Google の日本語音声データを入れると声が自然になります（無料）。" : "ヒント：iPhone の 設定 → アクセシビリティ → 読み上げコンテンツ → 声 → 日本語 で「拡張」や「プレミアム」の声を無料でダウンロードすると、ぐっと自然な声になります。" }),
-        /* @__PURE__ */ jsx7(Text6, { style: styles6.label, children: "速さ" }),
-        /* @__PURE__ */ jsx7(View6, { style: styles6.row, children: RATES.map((r) => /* @__PURE__ */ jsx7(Chip2, { label: r.label, active: settings.rate === r.value, onPress: () => set({ rate: r.value }) }, r.value)) }),
-        /* @__PURE__ */ jsx7(Text6, { style: styles6.label, children: "声の高さ" }),
-        /* @__PURE__ */ jsx7(View6, { style: styles6.row, children: PITCHES.map((p) => /* @__PURE__ */ jsx7(Chip2, { label: p.label, active: settings.pitch === p.value, onPress: () => set({ pitch: p.value }) }, p.value)) }),
-        /* @__PURE__ */ jsxs7(View6, { style: styles6.switchRow, children: [
-          /* @__PURE__ */ jsxs7(View6, { style: { flex: 1 }, children: [
-            /* @__PURE__ */ jsx7(Text6, { style: styles6.switchLabel, children: "開始の効果音" }),
-            /* @__PURE__ */ jsx7(Text6, { style: styles6.note, children: "読み上げの前に短いサウンドを鳴らします" })
-          ] }),
-          /* @__PURE__ */ jsx7(
-            Switch,
-            {
-              value: settings.sound,
-              onValueChange: (sound) => set({ sound }),
-              trackColor: { true: colors.accent, false: colors.surfaceHigh },
-              thumbColor: "#fff"
-            }
-          )
-        ] }),
-        /* @__PURE__ */ jsxs7(View6, { style: styles6.switchRow, children: [
-          /* @__PURE__ */ jsxs7(View6, { style: { flex: 1 }, children: [
-            /* @__PURE__ */ jsx7(Text6, { style: styles6.switchLabel, children: "BGM" }),
-            /* @__PURE__ */ jsx7(Text6, { style: styles6.note, children: "読み上げ中に低いビートを小さく流します" })
-          ] }),
-          /* @__PURE__ */ jsx7(
-            Switch,
-            {
-              value: settings.bgm,
-              onValueChange: (bgm) => set({ bgm }),
-              trackColor: { true: colors.accent, false: colors.surfaceHigh },
-              thumbColor: "#fff"
-            }
-          )
-        ] }),
-        /* @__PURE__ */ jsx7(Pressable5, { onPress: () => sample(settings), style: styles6.testButton, children: /* @__PURE__ */ jsx7(Text6, { style: styles6.testText, children: "▶ 試し聞き" }) })
-      ] })
+            ),
+            /* @__PURE__ */ jsx7(View6, { style: [styles6.row, { marginTop: 8 }], children: /* @__PURE__ */ jsx7(Pressable5, { onPress: checkEleven, style: [styles6.chip, { flexGrow: 0, flexBasis: "auto", paddingHorizontal: 16 }], children: /* @__PURE__ */ jsx7(Text6, { style: styles6.chipText, children: "接続を確認" }) }) }),
+            elevenStatus ? /* @__PURE__ */ jsx7(Text6, { style: [styles6.note, { color: colors.text }], children: elevenStatus }) : null,
+            settings.elevenKey.trim() ? /* @__PURE__ */ jsx7(View6, { style: [styles6.voiceList, { marginTop: 10 }], children: ELEVEN_VOICES.map((v) => /* @__PURE__ */ jsx7(
+              VoiceRow,
+              {
+                name: v.name,
+                sub: v.desc,
+                active: settings.elevenVoice === v.id,
+                onPress: () => {
+                  const next = { ...settings, elevenVoice: v.id };
+                  onChange(next);
+                  sample(next);
+                }
+              },
+              v.id
+            )) }) : null,
+            /* @__PURE__ */ jsx7(Text6, { style: styles6.note, children: "elevenlabs.io で無料登録 → 左下のメニュー →「Developers」→「API Keys」でキーを作成して貼り付けます。キーはこのスマホの中だけに保存されます。" }),
+            /* @__PURE__ */ jsx7(Text6, { style: styles6.label, children: "端末の声（AIボイス未設定のとき）" }),
+            /* @__PURE__ */ jsxs7(View6, { style: styles6.voiceList, children: [
+              /* @__PURE__ */ jsx7(
+                VoiceRow,
+                {
+                  name: "おまかせ",
+                  sub: "一番良い日本語の声を自動で選びます",
+                  active: !settings.voiceId,
+                  onPress: () => {
+                    const next = { ...settings, voiceId: void 0 };
+                    onChange(next);
+                    sample(next);
+                  }
+                }
+              ),
+              (voices ?? []).map((v) => /* @__PURE__ */ jsx7(
+                VoiceRow,
+                {
+                  name: v.name,
+                  sub: v.enhanced ? "高品質" : void 0,
+                  active: settings.voiceId === v.id,
+                  onPress: () => {
+                    const next = { ...settings, voiceId: v.id };
+                    onChange(next);
+                    sample(next);
+                  }
+                },
+                v.id
+              )),
+              voices !== null && voices.length === 0 && /* @__PURE__ */ jsx7(Text6, { style: styles6.note, children: "この端末では日本語の声の一覧を取得できませんでした。" })
+            ] }),
+            /* @__PURE__ */ jsx7(Text6, { style: styles6.note, children: Platform3.OS === "android" ? "ヒント：設定 → システム → 言語と入力 → テキスト読み上げ で、Google の日本語音声データを入れると声が自然になります（無料）。" : "ヒント：iPhone の 設定 → アクセシビリティ → 読み上げコンテンツ → 声 → 日本語 で「拡張」や「プレミアム」の声を無料でダウンロードすると、ぐっと自然な声になります。" }),
+            /* @__PURE__ */ jsx7(Text6, { style: styles6.label, children: "速さ" }),
+            /* @__PURE__ */ jsx7(View6, { style: styles6.row, children: RATES.map((r) => /* @__PURE__ */ jsx7(Chip2, { label: r.label, active: settings.rate === r.value, onPress: () => set({ rate: r.value }) }, r.value)) }),
+            /* @__PURE__ */ jsx7(Text6, { style: styles6.label, children: "声の高さ" }),
+            /* @__PURE__ */ jsx7(View6, { style: styles6.row, children: PITCHES.map((p) => /* @__PURE__ */ jsx7(Chip2, { label: p.label, active: settings.pitch === p.value, onPress: () => set({ pitch: p.value }) }, p.value)) }),
+            /* @__PURE__ */ jsxs7(View6, { style: styles6.switchRow, children: [
+              /* @__PURE__ */ jsxs7(View6, { style: { flex: 1 }, children: [
+                /* @__PURE__ */ jsx7(Text6, { style: styles6.switchLabel, children: "開始の効果音" }),
+                /* @__PURE__ */ jsx7(Text6, { style: styles6.note, children: "読み上げの前に短いサウンドを鳴らします" })
+              ] }),
+              /* @__PURE__ */ jsx7(
+                Switch,
+                {
+                  value: settings.sound,
+                  onValueChange: (sound) => set({ sound }),
+                  trackColor: { true: colors.accent, false: colors.surfaceHigh },
+                  thumbColor: "#fff"
+                }
+              )
+            ] }),
+            /* @__PURE__ */ jsxs7(View6, { style: styles6.switchRow, children: [
+              /* @__PURE__ */ jsxs7(View6, { style: { flex: 1 }, children: [
+                /* @__PURE__ */ jsx7(Text6, { style: styles6.switchLabel, children: "BGM" }),
+                /* @__PURE__ */ jsx7(Text6, { style: styles6.note, children: "読み上げ中に低いビートを小さく流します" })
+              ] }),
+              /* @__PURE__ */ jsx7(
+                Switch,
+                {
+                  value: settings.bgm,
+                  onValueChange: (bgm) => set({ bgm }),
+                  trackColor: { true: colors.accent, false: colors.surfaceHigh },
+                  thumbColor: "#fff"
+                }
+              )
+            ] }),
+            /* @__PURE__ */ jsx7(Pressable5, { onPress: () => sample(settings), style: styles6.testButton, children: /* @__PURE__ */ jsx7(Text6, { style: styles6.testText, children: "▶ 試し聞き" }) })
+          ]
+        }
+      )
     ] })
   ] }) });
 }
 function describeElevenError(e) {
   if (e instanceof ElevenError) {
-    if (e.status === 401) return "APIキーが正しくないようです。コピーし直してみてください。";
-    if (e.status === 402 || /quota/i.test(e.message)) return "今月の無料枠を使い切りました。端末の声で読み上げます。";
-    return `ElevenLabs でエラーが起きました（${e.status}）。`;
+    if (e.status === 0) return "ElevenLabs から返事がありません。電波の良い所でもう一度押してください。";
+    if (e.code === "missing_permissions")
+      return "このキーには声を作る権限がありません。ElevenLabs でキーを作り直し、「Text to Speech」をオンにしてください。";
+    if (e.code === "detected_unusual_activity")
+      return "ElevenLabs が無料プランの利用を止めています（VPNや複数アカウントが原因のことがあります）。";
+    if (e.status === 402 || e.code === "quota_exceeded" || /quota/i.test(e.message))
+      return "今月の無料枠を使い切りました。端末の声で読み上げます。";
+    if (e.status === 401) return "APIキーが正しくないようです。コピーし直して、前後に空白が入っていないか確かめてください。";
+    return `ElevenLabs でエラーが起きました（${e.status}${e.code ? `：${e.code}` : ""}）。`;
   }
   return "ElevenLabs に接続できませんでした。通信を確認してください。";
 }

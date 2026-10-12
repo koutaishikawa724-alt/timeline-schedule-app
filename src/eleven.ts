@@ -26,17 +26,41 @@ export const ELEVEN_VOICES: ElevenVoice[] = [
 export const DEFAULT_ELEVEN_VOICE = ELEVEN_VOICES[1].id;
 
 export class ElevenError extends Error {
+  /** ElevenLabs が返す理由（invalid_api_key, missing_permissions, quota_exceeded など） */
+  readonly code: string;
   constructor(
     message: string,
     readonly status: number,
   ) {
     super(message);
+    let code = '';
+    try {
+      const detail = JSON.parse(message)?.detail;
+      code = typeof detail?.status === 'string' ? detail.status : '';
+    } catch {
+      // 本文が JSON でないときは理由なし
+    }
+    this.code = code;
+  }
+}
+
+/** 通信が返ってこないまま固まらないよう、時間を区切って fetch する */
+async function fetchWithTimeout(url: string, init: RequestInit, ms: number): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } catch (e) {
+    if (ctrl.signal.aborted) throw new ElevenError('timeout', 0);
+    throw e;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
 /** 残り文字数の確認（キーが正しいかのテストにも使う） */
 export async function getElevenQuota(apiKey: string): Promise<{ used: number; limit: number }> {
-  const res = await fetch(`${API}/user/subscription`, { headers: { 'xi-api-key': apiKey } });
+  const res = await fetchWithTimeout(`${API}/user/subscription`, { headers: { 'xi-api-key': apiKey } }, 15000);
   if (!res.ok) throw new ElevenError(await res.text(), res.status);
   const data = (await res.json()) as { character_count: number; character_limit: number };
   return { used: data.character_count, limit: data.character_limit };
@@ -62,7 +86,7 @@ export async function synthesizeEleven(text: string, apiKey: string, voiceId: st
     return file.uri;
   }
 
-  const res = await fetch(`${API}/text-to-speech/${voiceId}?output_format=mp3_44100_128`, {
+  const res = await fetchWithTimeout(`${API}/text-to-speech/${voiceId}?output_format=mp3_44100_128`, {
     method: 'POST',
     headers: { 'xi-api-key': apiKey, 'Content-Type': 'application/json', Accept: 'audio/mpeg' },
     body: JSON.stringify({
@@ -71,7 +95,7 @@ export async function synthesizeEleven(text: string, apiKey: string, voiceId: st
       language_code: 'ja',
       voice_settings: { stability: 0.45, similarity_boost: 0.8, style: 0.35, use_speaker_boost: true },
     }),
-  });
+  }, 30000);
   if (!res.ok) throw new ElevenError(await res.text(), res.status);
 
   let uri: string;

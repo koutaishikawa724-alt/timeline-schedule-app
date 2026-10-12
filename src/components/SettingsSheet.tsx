@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { colors } from '../theme';
 import { NarrationStyle, PITCH_OPTIONS, RATE_OPTIONS, Settings, STYLE_LABELS } from '../settings';
 import { listJapaneseVoices, previewVoice, VoiceOption } from '../briefing';
@@ -55,18 +55,29 @@ export default function SettingsSheet({ visible, settings, onChange, onClose }: 
   const checkEleven = async () => {
     const key = settings.elevenKey.trim();
     if (!key) return setElevenStatus('APIキーを入力してください');
+    Keyboard.dismiss();
     setElevenStatus('確認中…');
     try {
       const q = await getElevenQuota(key);
       setElevenStatus(`接続OK。今月の残り：${Math.max(0, q.limit - q.used).toLocaleString()}文字（1回の読み上げで約300文字）`);
     } catch (e) {
-      setElevenStatus(describeElevenError(e));
+      // 残り文字数を見る権限がないキーでも、声が作れれば使える。実際に短い声を作って確かめる
+      if (e instanceof ElevenError && e.code === 'missing_permissions') {
+        try {
+          await previewEleven('接続できました。', key, settings.elevenVoice);
+          setElevenStatus('接続OK。下から好きな声を選んでください。');
+        } catch (e2) {
+          setElevenStatus(describeElevenError(e2));
+        }
+      } else {
+        setElevenStatus(describeElevenError(e));
+      }
     }
   };
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.backdrop}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={styles.sheet}>
           <View style={styles.grabber} />
@@ -77,7 +88,11 @@ export default function SettingsSheet({ visible, settings, onChange, onClose }: 
             </Pressable>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 12 }}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 12 }}
+            keyboardShouldPersistTaps="handled"
+          >
             <Text style={styles.label}>呼びかける名前</Text>
             <TextInput
               value={settings.name}
@@ -223,16 +238,22 @@ export default function SettingsSheet({ visible, settings, onChange, onClose }: 
             </Pressable>
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 function describeElevenError(e: unknown): string {
   if (e instanceof ElevenError) {
-    if (e.status === 401) return 'APIキーが正しくないようです。コピーし直してみてください。';
-    if (e.status === 402 || /quota/i.test(e.message)) return '今月の無料枠を使い切りました。端末の声で読み上げます。';
-    return `ElevenLabs でエラーが起きました（${e.status}）。`;
+    if (e.status === 0) return 'ElevenLabs から返事がありません。電波の良い所でもう一度押してください。';
+    if (e.code === 'missing_permissions')
+      return 'このキーには声を作る権限がありません。ElevenLabs でキーを作り直し、「Text to Speech」をオンにしてください。';
+    if (e.code === 'detected_unusual_activity')
+      return 'ElevenLabs が無料プランの利用を止めています（VPNや複数アカウントが原因のことがあります）。';
+    if (e.status === 402 || e.code === 'quota_exceeded' || /quota/i.test(e.message))
+      return '今月の無料枠を使い切りました。端末の声で読み上げます。';
+    if (e.status === 401) return 'APIキーが正しくないようです。コピーし直して、前後に空白が入っていないか確かめてください。';
+    return `ElevenLabs でエラーが起きました（${e.status}${e.code ? `：${e.code}` : ''}）。`;
   }
   return 'ElevenLabs に接続できませんでした。通信を確認してください。';
 }
