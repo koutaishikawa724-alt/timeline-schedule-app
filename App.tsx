@@ -141,13 +141,13 @@ function Main() {
   const startBriefing = useCallback(async () => {
     setToast(null);
     const run = ++briefRun.current;
-    setBriefIndex(0);
+    setBriefIndex(-1); // -1 = オープニングのタイトル
     setBriefing([]); // 空 = 原稿を準備中
     const ai = await fetchAiBriefing(selectedKey, events, dayLabel);
     if (run !== briefRun.current) return; // 準備中に停止された
     const segs = ai ?? buildBriefing(selectedKey, events, dayLabel, { name: settings.name, style: settings.style });
     setBriefing(segs);
-    briefHandle.current = playBriefing(segs, settings, setBriefIndex, () => {
+    briefHandle.current = playBriefing(segs, setBriefIndex, () => {
       briefHandle.current = null;
       setBriefing(null);
     });
@@ -175,7 +175,7 @@ function Main() {
             <Text style={styles.kicker}>{dayLabel ? (dayLabel === '今日' ? 'TODAY' : 'TOMORROW') : 'SCHEDULE'}</Text>
             <Text style={styles.date}>{dateTitle}</Text>
           </View>
-          <Pressable onPress={() => setSettingsOpen(true)} style={styles.gear} hitSlop={8} accessibilityLabel="ナレーション設定">
+          <Pressable onPress={() => setSettingsOpen(true)} style={styles.gear} hitSlop={8} accessibilityLabel="ブリーフィング設定">
             <VoiceIcon color={colors.textSub} />
           </Pressable>
         </View>
@@ -242,9 +242,9 @@ function Main() {
             <Text style={styles.playGlyph}>▶</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.briefTitle}>ブリーフィングを聞く</Text>
+            <Text style={styles.briefTitle}>ブリーフィングを見る</Text>
             <Text style={styles.briefSub}>
-              {dayLabel ?? 'この日'}の予定 {events.length}件 を{aiBriefingEnabled ? ' AI ナレーションで' : 'ボイスで'}読み上げ
+              {dayLabel ?? 'この日'}の予定 {events.length}件 を{aiBriefingEnabled ? ' AI が' : ''}映画のオープニング風に紹介
             </Text>
           </View>
         </Pressable>
@@ -324,6 +324,7 @@ function Main() {
         events={events}
         title={`${dayLabel ?? ''} ${dateTitle}`.trim()}
         onStop={stopBriefing}
+        onSkip={() => briefHandle.current?.skip()}
       />
     </SafeAreaView>
   );

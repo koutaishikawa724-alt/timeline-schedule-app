@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import React from 'react';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { colors } from '../theme';
-import { NarrationStyle, PITCH_OPTIONS, RATE_OPTIONS, Settings, STYLE_LABELS } from '../settings';
-import { listJapaneseVoices, previewVoice, VoiceOption } from '../briefing';
+import { NarrationStyle, Settings, STYLE_LABELS } from '../settings';
 
 type Props = {
   visible: boolean;
@@ -10,9 +9,6 @@ type Props = {
   onChange: (s: Settings) => void;
   onClose: () => void;
 };
-
-const RATES = RATE_OPTIONS;
-const PITCHES = PITCH_OPTIONS;
 
 const STYLE_SAMPLE: Record<NarrationStyle, string> = {
   mission: 'これより、本日の作戦概要をお伝えします。',
@@ -30,16 +26,8 @@ function Chip({ label, sub, active, onPress }: { label: string; sub?: string; ac
 }
 
 export default function SettingsSheet({ visible, settings, onChange, onClose }: Props) {
-  const [voices, setVoices] = useState<VoiceOption[] | null>(null);
-
-  // 開くたびに読み直す（iPhoneの設定で声をダウンロードして戻ってきたとき、すぐ一覧に出るように）
-  useEffect(() => {
-    if (visible) listJapaneseVoices().then(setVoices);
-  }, [visible]);
-
   const set = (patch: Partial<Settings>) => onChange({ ...settings, ...patch });
-  const sampleText = (s: Settings) => `${s.name ? `${s.name}さん、` : ''}${STYLE_SAMPLE[s.style]}`;
-  const sample = (s: Settings) => previewVoice(sampleText(s), s);
+  const sampleText = `${settings.name ? `${settings.name}さん、` : ''}${STYLE_SAMPLE[settings.style]}`;
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -48,7 +36,7 @@ export default function SettingsSheet({ visible, settings, onChange, onClose }: 
         <View style={styles.sheet}>
           <View style={styles.grabber} />
           <View style={styles.headerRow}>
-            <Text style={styles.heading}>ナレーション設定</Text>
+            <Text style={styles.heading}>ブリーフィング設定</Text>
             <Pressable onPress={onClose} hitSlop={10}>
               <Text style={styles.done}>完了</Text>
             </Pressable>
@@ -69,7 +57,7 @@ export default function SettingsSheet({ visible, settings, onChange, onClose }: 
               maxLength={12}
             />
 
-            <Text style={styles.label}>語り口</Text>
+            <Text style={styles.label}>演出のテイスト</Text>
             <View style={styles.row}>
               {(Object.keys(STYLE_LABELS) as NarrationStyle[]).map((k) => (
                 <Chip
@@ -77,119 +65,20 @@ export default function SettingsSheet({ visible, settings, onChange, onClose }: 
                   label={STYLE_LABELS[k].label}
                   sub={STYLE_LABELS[k].desc}
                   active={settings.style === k}
-                  onPress={() => {
-                    const next = { ...settings, style: k };
-                    onChange(next);
-                    sample(next);
-                  }}
+                  onPress={() => set({ style: k })}
                 />
               ))}
             </View>
 
-            <Text style={styles.label}>声</Text>
-            {voices !== null && !voices.some((v) => v.enhanced) && Platform.OS !== 'web' && (
-              <View style={styles.guide}>
-                <Text style={styles.guideTitle}>もっと自然な声にする（無料）</Text>
-                <Text style={styles.guideText}>
-                  {Platform.OS === 'android'
-                    ? '設定 → システム → 言語と入力 → テキスト読み上げ で、Google の日本語音声データをダウンロードしてください。'
-                    : '設定 → アクセシビリティ → 読み上げコンテンツ → 声 → 日本語 で「Otoya（プレミアム）」か「Kyoko（拡張）」をダウンロードしてください。戻ってくると自動でその声に切り替わります。'}
-                </Text>
-              </View>
-            )}
-            <View style={styles.voiceList}>
-              <VoiceRow
-                name="おまかせ"
-                sub="一番良い日本語の声を自動で選びます"
-                active={!settings.voiceId}
-                onPress={() => {
-                  const next = { ...settings, voiceId: undefined };
-                  onChange(next);
-                  sample(next);
-                }}
-              />
-              {(voices ?? []).map((v) => (
-                <VoiceRow
-                  key={v.id}
-                  name={v.name}
-                  sub={v.enhanced ? '高品質' : undefined}
-                  active={settings.voiceId === v.id}
-                  onPress={() => {
-                    const next = { ...settings, voiceId: v.id };
-                    onChange(next);
-                    sample(next);
-                  }}
-                />
-              ))}
-              {voices !== null && voices.length === 0 && (
-                <Text style={styles.note}>この端末では日本語の声の一覧を取得できませんでした。</Text>
-              )}
+            <Text style={styles.label}>こんな感じで始まります</Text>
+            <View style={styles.sample}>
+              <Text style={styles.sampleKicker}>BRIEFING</Text>
+              <Text style={styles.sampleText}>{sampleText}</Text>
             </View>
-            <Text style={styles.note}>
-              {Platform.OS === 'android'
-                ? 'ヒント：設定 → システム → 言語と入力 → テキスト読み上げ で、Google の日本語音声データを入れると声が自然になります（無料）。'
-                : 'ヒント：iPhone の 設定 → アクセシビリティ → 読み上げコンテンツ → 声 → 日本語 で「拡張」や「プレミアム」の声を無料でダウンロードすると、ぐっと自然な声になります。'}
-            </Text>
-
-            <Text style={styles.label}>速さ</Text>
-            <View style={styles.row}>
-              {RATES.map((r) => (
-                <Chip key={r.value} label={r.label} active={settings.rate === r.value} onPress={() => set({ rate: r.value })} />
-              ))}
-            </View>
-
-            <Text style={styles.label}>声の高さ</Text>
-            <View style={styles.row}>
-              {PITCHES.map((p) => (
-                <Chip key={p.value} label={p.label} active={settings.pitch === p.value} onPress={() => set({ pitch: p.value })} />
-              ))}
-            </View>
-
-            <View style={styles.switchRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.switchLabel}>開始の効果音</Text>
-                <Text style={styles.note}>読み上げの前に短いサウンドを鳴らします</Text>
-              </View>
-              <Switch
-                value={settings.sound}
-                onValueChange={(sound) => set({ sound })}
-                trackColor={{ true: colors.accent, false: colors.surfaceHigh }}
-                thumbColor="#fff"
-              />
-            </View>
-
-            <View style={styles.switchRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.switchLabel}>BGM</Text>
-                <Text style={styles.note}>読み上げ中に低いビートを小さく流します</Text>
-              </View>
-              <Switch
-                value={settings.bgm}
-                onValueChange={(bgm) => set({ bgm })}
-                trackColor={{ true: colors.accent, false: colors.surfaceHigh }}
-                thumbColor="#fff"
-              />
-            </View>
-
-            <Pressable onPress={() => sample(settings)} style={styles.testButton}>
-              <Text style={styles.testText}>▶ 試し聞き</Text>
-            </Pressable>
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
     </Modal>
-  );
-}
-
-function VoiceRow({ name, sub, active, onPress }: { name: string; sub?: string; active: boolean; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress} style={[styles.voiceRow, active && styles.voiceRowActive]}>
-      <View style={[styles.radio, active && styles.radioActive]} />
-      <Text style={styles.voiceName} numberOfLines={1}>
-        {name}
-      </Text>
-      {sub ? <Text style={styles.voiceSub}>{sub}</Text> : null}
-    </Pressable>
   );
 }
 
@@ -227,34 +116,16 @@ const styles = StyleSheet.create({
   chipText: { color: colors.textSub, fontSize: 14, fontWeight: '700' },
   chipTextActive: { color: '#fff' },
   chipSub: { color: colors.textMuted, fontSize: 10, marginTop: 2 },
-  voiceList: { backgroundColor: colors.surfaceHigh, borderRadius: 14, overflow: 'hidden' },
-  voiceRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 14, gap: 10 },
-  voiceRowActive: { backgroundColor: colors.accentSoft },
-  radio: { width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: colors.textMuted },
-  radioActive: { borderColor: colors.accent, backgroundColor: colors.accent },
-  voiceName: { flex: 1, color: colors.text, fontSize: 15 },
-  voiceSub: { color: colors.accent, fontSize: 11, fontWeight: '700' },
-  note: { color: colors.textMuted, fontSize: 12, lineHeight: 18, marginTop: 6 },
-  guide: {
-    backgroundColor: 'rgba(108,140,255,0.12)',
-    borderColor: 'rgba(108,140,255,0.35)',
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 10,
-  },
-  guideTitle: { color: colors.text, fontSize: 14, fontWeight: '700', marginBottom: 4 },
-  guideText: { color: colors.textSub, fontSize: 13, lineHeight: 19 },
-  switchRow: { flexDirection: 'row', alignItems: 'center', marginTop: 18, gap: 12 },
-  switchLabel: { color: colors.text, fontSize: 15 },
-  testButton: {
-    marginTop: 22,
-    paddingVertical: 14,
+  sample: {
+    backgroundColor: '#05060C',
     borderRadius: 16,
-    alignItems: 'center',
-    backgroundColor: colors.accentSoft,
     borderWidth: 1,
-    borderColor: 'rgba(108,140,255,0.35)',
+    borderColor: colors.border,
+    paddingVertical: 22,
+    paddingHorizontal: 18,
+    alignItems: 'center',
   },
-  testText: { color: colors.text, fontSize: 15, fontWeight: '700' },
+  sampleKicker: { color: colors.accent, fontSize: 11, letterSpacing: 6, fontWeight: '700', marginBottom: 10 },
+  sampleText: { color: colors.text, fontSize: 17, lineHeight: 27, textAlign: 'center', fontWeight: '600' },
+  note: { color: colors.textMuted, fontSize: 12, lineHeight: 18, marginTop: 6 },
 });

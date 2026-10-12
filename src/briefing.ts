@@ -1,5 +1,3 @@
-import * as Speech from 'expo-speech';
-import { AudioPlayer, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { ScheduleEvent } from './types';
 import { fromKey, speakDuration, speakTime, weekday } from './date';
 import { NarrationStyle } from './settings';
@@ -8,10 +6,8 @@ export type BriefingSegment = {
   text: string;
   /** この文で読み上げている予定（円グラフのハイライト用） */
   eventId?: string;
-  /** サーバーで作った高品質音声。無ければ端末の音声合成で読む */
+  /** サーバーで作った音声（今は使っていない） */
   audioUrl?: string;
-  /** 作成中の音声。できたら再生用URI、失敗なら undefined */
-  audio?: Promise<string | undefined>;
 };
 
 const API_URL = process.env.EXPO_PUBLIC_BRIEFING_API_URL?.replace(/\/$/, '');
@@ -208,205 +204,44 @@ export function buildBriefing(
   return segs;
 }
 
-const INTRO_SOUND = require('../assets/sounds/intro.wav');
-const BGM = require('../assets/sounds/bgm.wav');
-/** 文と文の間の「ため」 */
-const GAP_MS = 380;
-const BGM_VOLUME = 0.22;
+/** 1文を見せる時間。文字が出きってから読む余裕を残す */
+export function segmentDuration(text: string): number {
+  return Math.min(6000, Math.max(2400, 1200 + text.length * 110));
+}
 
-export type VoiceOption = { id: string; name: string; enhanced: boolean };
+export type BriefingHandle = { stop: () => void; skip: () => void };
 
 /**
- * 声の良さの目安。名前やIDに含まれる品質の印（Premium / Enhanced）を最優先し、
- * 次にブリーフィングに合う落ち着いた男性の声（Otoya、Hattori）を選ぶ。
+ * 原稿を1文ずつ、時間で区切って順に見せる（映画のオープニング風。音は出さない）。
+ * onSegment で今の文を通知し、最後まで行ったら onFinish。
  */
-function voiceScore(v: Speech.Voice): number {
-  const label = `${v.name} ${v.identifier}`;
-  let score = 0;
-  if (/premium|プレミアム/i.test(label)) score += 6;
-  if (v.quality === Speech.VoiceQuality.Enhanced || /enhanced|拡張|高品質/i.test(label)) score += 4;
-  if (/otoya|hattori|男性|male/i.test(label) && !/female/i.test(label)) score += 2;
-  if (/google/i.test(label)) score += 1;
-  if (/compact|eloquence|novelty/i.test(label)) score -= 3;
-  return score;
-}
-
-/** 端末に入っている日本語の声の一覧（良い声を先頭に） */
-export async function listJapaneseVoices(): Promise<VoiceOption[]> {
-  try {
-    // 音声一覧が返ってこない端末・ブラウザでも止まらないよう、1.5秒で諦める
-    const voices = await Promise.race([
-      Speech.getAvailableVoicesAsync(),
-      new Promise<Speech.Voice[]>((resolve) => setTimeout(() => resolve([]), 1500)),
-    ]);
-    return voices
-      .filter((v) => v.language?.toLowerCase().replace('_', '-').startsWith('ja'))
-      .map((v) => ({
-        id: v.identifier,
-        name: v.name,
-        enhanced: v.quality === Speech.VoiceQuality.Enhanced || /premium|enhanced|プレミアム|拡張|高品質/i.test(`${v.name} ${v.identifier}`),
-        score: voiceScore(v),
-      }))
-      .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
-      .map(({ score: _score, ...v }) => v);
-  } catch {
-    return [];
-  }
-}
-
-let autoVoice: VoiceOption | undefined;
-
-async function resolveVoice(voiceId?: string): Promise<string | undefined> {
-  if (voiceId) return voiceId;
-  // 高品質な声が見つかるまでは毎回探し直す（iPhoneの設定で声をダウンロードした直後でも、すぐ使えるように）
-  if (!autoVoice?.enhanced) autoVoice = (await listJapaneseVoices())[0] ?? autoVoice;
-  return autoVoice?.id;
-}
-
-export type VoiceSettings = { voiceId?: string; rate: number; pitch: number; sound: boolean; bgm?: boolean };
-
-/** 音源を1回鳴らし、終わったら onDone。止めるための player を返す */
-function playSource(source: Parameters<typeof createAudioPlayer>[0], onDone: () => void): AudioPlayer {
-  const p = createAudioPlayer(source);
-  let done = false;
-  p.addListener('playbackStatusUpdate', (status) => {
-    if (status.didJustFinish && !done) {
-      done = true;
-      onDone();
-    }
-  });
-  p.play();
-  return p;
-}
-
-/** 設定画面の「試し聞き」用 */
-export async function previewVoice(text: string, voice: VoiceSettings): Promise<void> {
-  await Speech.stop();
-  Speech.speak(text, { language: 'ja-JP', voice: await resolveVoice(voice.voiceId), rate: voice.rate, pitch: voice.pitch });
-}
-
-export type BriefingHandle = { stop: () => void };
-
-/** 効果音のあと、原稿を1文ずつ順に読み上げる。onSegment で今読んでいる文を通知 */
 export function playBriefing(
   segments: BriefingSegment[],
-  voice: VoiceSettings,
   onSegment: (index: number) => void,
   onFinish: () => void,
 ): BriefingHandle {
-  let cancelled = false;
-  let player: AudioPlayer | null = null;
-  let bgm: AudioPlayer | null = null;
-  let gapTimer: ReturnType<typeof setTimeout> | null = null;
+  let index = -1;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let finished = false;
 
-  const releasePlayer = () => {
-    player?.remove();
-    player = null;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    if (timer) clearTimeout(timer);
+    onFinish();
   };
 
-  const startBgm = () => {
-    if (!voice.bgm || !BGM || bgm) return;
-    try {
-      bgm = createAudioPlayer(BGM);
-      bgm.loop = true;
-      bgm.volume = BGM_VOLUME;
-      bgm.play();
-    } catch {
-      bgm = null;
-    }
-  };
-
-  /** BGMを少しずつ小さくして止める */
-  const stopBgm = (fade: boolean) => {
-    const p = bgm;
-    bgm = null;
-    if (!p) return;
-    if (!fade) return p.remove();
-    let v = BGM_VOLUME;
-    const t = setInterval(() => {
-      v -= BGM_VOLUME / 12;
-      if (v <= 0) {
-        clearInterval(t);
-        p.remove();
-      } else {
-        p.volume = v;
-      }
-    }, 100);
-  };
-
-  const nextAfterGap = (i: number) => {
-    gapTimer = setTimeout(() => void speakAt(i), GAP_MS);
-  };
-
-  const speakAt = async (i: number) => {
-    releasePlayer();
-    if (cancelled) return;
-    if (i >= segments.length) {
-      stopBgm(true);
-      onFinish();
-      return;
-    }
-    if (i === 0) startBgm();
+  const show = (i: number) => {
+    if (timer) clearTimeout(timer);
+    if (finished) return;
+    if (i >= segments.length) return finish();
+    index = i;
     onSegment(i);
-    const seg = segments[i];
-
-    let uri = seg.audioUrl;
-    if (!uri && seg.audio) {
-      uri = await Promise.race([seg.audio, new Promise<undefined>((r) => setTimeout(() => r(undefined), 20_000))]);
-      if (cancelled) return;
-    }
-
-    if (uri) {
-      try {
-        player = playSource({ uri }, () => nextAfterGap(i + 1));
-        return;
-      } catch {
-        // 再生できなければ端末の音声で読む
-      }
-    }
-
-    const voiceId = await resolveVoice(voice.voiceId);
-    if (cancelled) return;
-    Speech.speak(seg.text, {
-      language: 'ja-JP',
-      voice: voiceId,
-      rate: voice.rate,
-      pitch: voice.pitch,
-      onDone: () => nextAfterGap(i + 1),
-      onError: () => nextAfterGap(i + 1),
-    });
+    timer = setTimeout(() => show(i + 1), segmentDuration(segments[i].text));
   };
 
-  const start = () => {
-    if (cancelled) return;
-    if (!voice.sound || !INTRO_SOUND) return void speakAt(0);
-    try {
-      // 効果音が終わらない環境でも先に進めるよう、保険のタイマーも置く
-      let started = false;
-      const go = () => {
-        if (started) return;
-        started = true;
-        void speakAt(0);
-      };
-      player = playSource(INTRO_SOUND, go);
-      setTimeout(go, 2500);
-    } catch {
-      void speakAt(0);
-    }
-  };
+  // タイトルを見せる「ため」を少し置いてから始める
+  timer = setTimeout(() => show(0), 900);
 
-  // iPhone のマナーモード中でも音を出す
-  setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
-  Speech.stop().finally(start);
-
-  return {
-    stop: () => {
-      cancelled = true;
-      if (gapTimer) clearTimeout(gapTimer);
-      releasePlayer();
-      stopBgm(false);
-      Speech.stop();
-      onFinish();
-    },
-  };
+  return { stop: finish, skip: () => show(index + 1) };
 }
