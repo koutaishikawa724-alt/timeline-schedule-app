@@ -1,18 +1,19 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import CircleSchedule, { defaultHalf, describeCenter } from './src/components/CircleSchedule';
 import CalendarView from './src/components/CalendarView';
 import EventList from './src/components/EventList';
 import EventEditor from './src/components/EventEditor';
-import { CalendarTabIcon, CircleTabIcon } from './src/components/TabIcons';
+import DiaryView from './src/components/DiaryView';
+import { CalendarTabIcon, CircleTabIcon, DiaryTabIcon } from './src/components/TabIcons';
 import { addDays, dateKey, fromKey, nowMinutes, weekday } from './src/date';
-import { loadSchedules, saveSchedules } from './src/storage';
-import { ScheduleEvent, ScheduleMap } from './src/types';
+import { loadDiary, loadSchedules, saveDiary, saveSchedules } from './src/storage';
+import { DiaryEntry, DiaryMap, ScheduleEvent, ScheduleMap } from './src/types';
 import { colors } from './src/theme';
 
-type Tab = 'circle' | 'calendar';
+type Tab = 'circle' | 'calendar' | 'diary';
 
 function useNow() {
   const [now, setNow] = useState(() => new Date());
@@ -40,16 +41,38 @@ function Main() {
   const [undo, setUndo] = useState<{ key: string; events: ScheduleEvent[]; label: string } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [diary, setDiary] = useState<DiaryMap>({});
+  const [diaryLoaded, setDiaryLoaded] = useState(false);
+
   useEffect(() => {
     loadSchedules().then((s) => {
       setSchedules(s);
       setLoaded(true);
+    });
+    loadDiary().then((d) => {
+      setDiary(d);
+      setDiaryLoaded(true);
     });
   }, []);
 
   useEffect(() => {
     if (loaded) saveSchedules(schedules);
   }, [schedules, loaded]);
+
+  // 日記は1文字ごとに変わるので、打ち終わって少ししてから保存する
+  useEffect(() => {
+    if (!diaryLoaded) return;
+    const t = setTimeout(() => saveDiary(diary), 400);
+    return () => clearTimeout(t);
+  }, [diary, diaryLoaded]);
+
+  const changeDiary = (key: string, entry: DiaryEntry | null) =>
+    setDiary((prev) => {
+      const next = { ...prev };
+      if (entry) next[key] = entry;
+      else delete next[key];
+      return next;
+    });
 
   const events = schedules[selectedKey] ?? [];
   const isToday = selectedKey === todayKey;
@@ -129,81 +152,94 @@ function Main() {
   return (
     <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>
       <StatusBar style="light" />
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.headerRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.kicker}>{dayLabel ? (dayLabel === '今日' ? 'TODAY' : 'TOMORROW') : 'SCHEDULE'}</Text>
-            <Text style={styles.date}>{dateTitle}</Text>
-          </View>
-        </View>
-
-        <View style={styles.segment}>
-          {[
-            { key: todayKey, label: '今日' },
-            { key: tomorrowKey, label: '明日' },
-          ].map((s) => (
-            <Pressable
-              key={s.key}
-              onPress={() => setSelectedKey(s.key)}
-              style={[styles.segItem, selectedKey === s.key && styles.segActive]}
-            >
-              <Text style={[styles.segText, selectedKey === s.key && styles.segTextActive]}>{s.label}</Text>
-            </Pressable>
-          ))}
-          {!dayLabel && (
-            <View style={[styles.segItem, styles.segActive]}>
-              <Text style={[styles.segText, styles.segTextActive]}>{`${sel.getMonth() + 1}/${sel.getDate()}`}</Text>
-            </View>
-          )}
-        </View>
-
-        {tab === 'circle' ? (
-          <View style={styles.circleWrap}>
-            <CircleSchedule
-              events={events}
-              size={circleSize}
-              nowMin={nowMin}
-              centerTitle={center.title}
-              centerSub={center.sub}
-              onPressEvent={openEdit}
-              half={half}
-            />
-            <View style={styles.halfSwitch}>
-              {(['午前', '午後'] as const).map((label, h) => (
-                <Pressable
-                  key={label}
-                  onPress={() => setHalf(h as 0 | 1)}
-                  style={[styles.halfItem, half === h && styles.halfActive]}
-                >
-                  <Text style={[styles.halfText, half === h && styles.halfTextActive]}>
-                    {label}
-                    {halfCounts[h] ? `  ${halfCounts[h]}件` : ''}
-                  </Text>
-                </Pressable>
-              ))}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+        >
+          <View style={styles.headerRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.kicker}>{dayLabel ? (dayLabel === '今日' ? 'TODAY' : 'TOMORROW') : 'SCHEDULE'}</Text>
+              <Text style={styles.date}>{dateTitle}</Text>
             </View>
           </View>
-        ) : (
-          <View style={{ marginTop: 18 }}>
-            <CalendarView
-              schedules={schedules}
-              selectedKey={selectedKey}
-              todayKey={todayKey}
-              onSelect={setSelectedKey}
-            />
-          </View>
-        )}
 
-        <View style={styles.sectionRow}>
-          <Text style={styles.section}>タイムライン</Text>
-          {events.length > 1 && (
-            <Pressable onPress={() => deleteEvents()} hitSlop={8}>
-              <Text style={styles.clearAll}>すべて消す</Text>
-            </Pressable>
+          <View style={styles.segment}>
+            {[
+              { key: todayKey, label: '今日' },
+              { key: tomorrowKey, label: '明日' },
+            ].map((s) => (
+              <Pressable
+                key={s.key}
+                onPress={() => setSelectedKey(s.key)}
+                style={[styles.segItem, selectedKey === s.key && styles.segActive]}
+              >
+                <Text style={[styles.segText, selectedKey === s.key && styles.segTextActive]}>{s.label}</Text>
+              </Pressable>
+            ))}
+            {!dayLabel && (
+              <View style={[styles.segItem, styles.segActive]}>
+                <Text style={[styles.segText, styles.segTextActive]}>{`${sel.getMonth() + 1}/${sel.getDate()}`}</Text>
+              </View>
+            )}
+          </View>
+
+          {tab === 'diary' ? (
+            <DiaryView diary={diary} selectedKey={selectedKey} onChange={changeDiary} onSelect={setSelectedKey} />
+          ) : tab === 'circle' ? (
+            <View style={styles.circleWrap}>
+              <CircleSchedule
+                events={events}
+                size={circleSize}
+                nowMin={nowMin}
+                centerTitle={center.title}
+                centerSub={center.sub}
+                onPressEvent={openEdit}
+                half={half}
+              />
+              <View style={styles.halfSwitch}>
+                {(['午前', '午後'] as const).map((label, h) => (
+                  <Pressable
+                    key={label}
+                    onPress={() => setHalf(h as 0 | 1)}
+                    style={[styles.halfItem, half === h && styles.halfActive]}
+                  >
+                    <Text style={[styles.halfText, half === h && styles.halfTextActive]}>
+                      {label}
+                      {halfCounts[h] ? `  ${halfCounts[h]}件` : ''}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ) : (
+            <View style={{ marginTop: 18 }}>
+              <CalendarView
+                schedules={schedules}
+                selectedKey={selectedKey}
+                todayKey={todayKey}
+                onSelect={setSelectedKey}
+              />
+            </View>
           )}
-        </View>
-        <EventList events={events} nowMin={nowMin} onPress={openEdit} onDelete={handleDelete} />
-      </ScrollView>
+
+          {tab !== 'diary' && (
+            <>
+              <View style={styles.sectionRow}>
+                <Text style={styles.section}>タイムライン</Text>
+                {events.length > 1 && (
+                  <Pressable onPress={() => deleteEvents()} hitSlop={8}>
+                    <Text style={styles.clearAll}>すべて消す</Text>
+                  </Pressable>
+                )}
+              </View>
+              <EventList events={events} nowMin={nowMin} onPress={openEdit} onDelete={handleDelete} />
+            </>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       {toast === 'saved' && (
         <View style={styles.toast}>
@@ -221,15 +257,18 @@ function Main() {
         </View>
       )}
 
-      <Pressable onPress={openNew} style={styles.fab}>
-        <Text style={styles.fabText}>＋</Text>
-      </Pressable>
+      {tab !== 'diary' && (
+        <Pressable onPress={openNew} style={styles.fab}>
+          <Text style={styles.fabText}>＋</Text>
+        </Pressable>
+      )}
 
       <SafeAreaView edges={['bottom']} style={styles.tabBar}>
         {(
           [
             { key: 'circle', label: 'サークル', Icon: CircleTabIcon },
             { key: 'calendar', label: 'カレンダー', Icon: CalendarTabIcon },
+            { key: 'diary', label: '日記', Icon: DiaryTabIcon },
           ] as const
         ).map((t) => (
           <Pressable key={t.key} onPress={() => setTab(t.key)} style={styles.tabItem}>

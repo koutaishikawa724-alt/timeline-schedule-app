@@ -7,6 +7,7 @@ Expo（React Native + TypeScript）製。iOS / Android / Web 共通コード。
 - タイムラインの各予定の × で削除、「すべて消す」でその日をまとめて削除、「元に戻す」で取り消し
 - 時計と同じ並び（12時が上）のサークル型タイムスケジュール。午前／午後を切り替え、現在時刻の針つき
 - 月カレンダー（予定のある日に色ドット、タップでその日を表示）
+- 日記（下の「日記」タブ）：気分を5段階で選び、文章を書くと自動で保存。前後の日へ移動、これまでの日記の一覧
 - 端末内に自動保存（AsyncStorage）
 
 ## 動かし方
@@ -30,4 +31,5 @@ Webアプリ版を Vercel（無料）で公開し、Safari の「ホーム画面
 - `src/components/CalendarView.tsx` カレンダー
 - `src/components/EventEditor.tsx` 予定入力シート
 - `src/components/EventList.tsx` タイムライン（削除ボタンつき）
+- `src/components/DiaryView.tsx` 日記
 - `snack/App.js` Expo Snack 用の1ファイル版（`scripts/build-snack.mjs` で作る）

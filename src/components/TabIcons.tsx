@@ -22,3 +22,14 @@ export function CalendarTabIcon({ color }: { color: string }) {
     </Svg>
   );
 }
+
+export function DiaryTabIcon({ color }: { color: string }) {
+  return (
+    <Svg width={24} height={24} viewBox="0 0 24 24">
+      <Rect x={5} y={3.5} width={14} height={17} rx={2.5} stroke={color} strokeWidth={2} fill="none" />
+      <Line x1={8.5} y1={8.5} x2={15.5} y2={8.5} stroke={color} strokeWidth={2} strokeLinecap="round" />
+      <Line x1={8.5} y1={12} x2={15.5} y2={12} stroke={color} strokeWidth={2} strokeLinecap="round" />
+      <Line x1={8.5} y1={15.5} x2={12.5} y2={15.5} stroke={color} strokeWidth={2} strokeLinecap="round" />
+    </Svg>
+  );
+}
