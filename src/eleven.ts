@@ -1,5 +1,4 @@
 import { Platform } from 'react-native';
-import { File, Paths } from 'expo-file-system';
 import { AudioPlayer, createAudioPlayer } from 'expo-audio';
 
 /**
@@ -66,25 +65,31 @@ export async function getElevenQuota(apiKey: string): Promise<{ used: number; li
   return { used: data.character_count, limit: data.character_limit };
 }
 
-function hash(s: string): string {
-  let h = 5381;
-  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
-  return (h >>> 0).toString(36);
-}
-
 const memoryCache = new Map<string, string>();
 
-/** 1文を音声にして、再生できる URI を返す。同じ文と声は端末に保存して使い回す（無料枠の節約） */
+const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+function toBase64(bytes: Uint8Array): string {
+  let out = '';
+  for (let i = 0; i < bytes.length; i += 3) {
+    const a = bytes[i];
+    const b = i + 1 < bytes.length ? bytes[i + 1] : 0;
+    const c = i + 2 < bytes.length ? bytes[i + 2] : 0;
+    out += B64[a >> 2] + B64[((a & 3) << 4) | (b >> 4)];
+    out += i + 1 < bytes.length ? B64[((b & 15) << 2) | (c >> 6)] : '=';
+    out += i + 2 < bytes.length ? B64[c & 63] : '=';
+  }
+  return out;
+}
+
+/**
+ * 1文を音声にして、再生できる URI を返す。同じ文と声はアプリを開いている間使い回す（無料枠の節約）。
+ * スマホでは data: URI にする（expo-audio がそのまま再生できる）。expo-file-system を使わないので Expo Snack でも動く。
+ */
 export async function synthesizeEleven(text: string, apiKey: string, voiceId: string): Promise<string> {
   const key = `${voiceId}:${text}`;
   const cached = memoryCache.get(key);
   if (cached) return cached;
-
-  const file = Platform.OS === 'web' ? null : new File(Paths.cache, `eleven-${hash(key)}.mp3`);
-  if (file?.exists) {
-    memoryCache.set(key, file.uri);
-    return file.uri;
-  }
 
   const res = await fetchWithTimeout(`${API}/text-to-speech/${voiceId}?output_format=mp3_44100_128`, {
     method: 'POST',
@@ -98,13 +103,10 @@ export async function synthesizeEleven(text: string, apiKey: string, voiceId: st
   }, 30000);
   if (!res.ok) throw new ElevenError(await res.text(), res.status);
 
-  let uri: string;
-  if (file) {
-    file.write(new Uint8Array(await res.arrayBuffer()));
-    uri = file.uri;
-  } else {
-    uri = URL.createObjectURL(await res.blob());
-  }
+  const uri =
+    Platform.OS === 'web'
+      ? URL.createObjectURL(await res.blob())
+      : `data:audio/mpeg;base64,${toBase64(new Uint8Array(await res.arrayBuffer()))}`;
   memoryCache.set(key, uri);
   return uri;
 }

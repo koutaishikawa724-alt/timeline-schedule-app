@@ -712,7 +712,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // ../../../../../../home/claude/schedule-app/src/eleven.ts
 import { Platform as Platform2 } from "react-native";
-import { File, Paths } from "expo-file-system";
 import { createAudioPlayer } from "expo-audio";
 var API = "https://api.elevenlabs.io/v1";
 var MODEL = "eleven_multilingual_v2";
@@ -758,21 +757,24 @@ async function getElevenQuota(apiKey) {
   const data = await res.json();
   return { used: data.character_count, limit: data.character_limit };
 }
-function hash(s) {
-  let h = 5381;
-  for (let i = 0; i < s.length; i++) h = (h << 5) + h + s.charCodeAt(i) | 0;
-  return (h >>> 0).toString(36);
-}
 var memoryCache = /* @__PURE__ */ new Map();
+var B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+function toBase64(bytes) {
+  let out = "";
+  for (let i = 0; i < bytes.length; i += 3) {
+    const a = bytes[i];
+    const b = i + 1 < bytes.length ? bytes[i + 1] : 0;
+    const c = i + 2 < bytes.length ? bytes[i + 2] : 0;
+    out += B64[a >> 2] + B64[(a & 3) << 4 | b >> 4];
+    out += i + 1 < bytes.length ? B64[(b & 15) << 2 | c >> 6] : "=";
+    out += i + 2 < bytes.length ? B64[c & 63] : "=";
+  }
+  return out;
+}
 async function synthesizeEleven(text, apiKey, voiceId) {
   const key = `${voiceId}:${text}`;
   const cached = memoryCache.get(key);
   if (cached) return cached;
-  const file = Platform2.OS === "web" ? null : new File(Paths.cache, `eleven-${hash(key)}.mp3`);
-  if (file?.exists) {
-    memoryCache.set(key, file.uri);
-    return file.uri;
-  }
   const res = await fetchWithTimeout(`${API}/text-to-speech/${voiceId}?output_format=mp3_44100_128`, {
     method: "POST",
     headers: { "xi-api-key": apiKey, "Content-Type": "application/json", Accept: "audio/mpeg" },
@@ -784,13 +786,7 @@ async function synthesizeEleven(text, apiKey, voiceId) {
     })
   }, 3e4);
   if (!res.ok) throw new ElevenError(await res.text(), res.status);
-  let uri;
-  if (file) {
-    file.write(new Uint8Array(await res.arrayBuffer()));
-    uri = file.uri;
-  } else {
-    uri = URL.createObjectURL(await res.blob());
-  }
+  const uri = Platform2.OS === "web" ? URL.createObjectURL(await res.blob()) : `data:audio/mpeg;base64,${toBase64(new Uint8Array(await res.arrayBuffer()))}`;
   memoryCache.set(key, uri);
   return uri;
 }
