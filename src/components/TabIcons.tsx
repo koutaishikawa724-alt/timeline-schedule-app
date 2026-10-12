@@ -33,3 +33,13 @@ export function DiaryTabIcon({ color }: { color: string }) {
     </Svg>
   );
 }
+
+export function InfoIcon({ color }: { color: string }) {
+  return (
+    <Svg width={22} height={22} viewBox="0 0 24 24">
+      <Circle cx={12} cy={12} r={9} stroke={color} strokeWidth={2} fill="none" />
+      <Line x1={12} y1={11} x2={12} y2={16.5} stroke={color} strokeWidth={2} strokeLinecap="round" />
+      <Circle cx={12} cy={7.6} r={1.2} fill={color} />
+    </Svg>
+  );
+}

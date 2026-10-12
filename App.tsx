@@ -7,9 +7,10 @@ import CalendarView from './src/components/CalendarView';
 import EventList from './src/components/EventList';
 import EventEditor from './src/components/EventEditor';
 import DiaryView from './src/components/DiaryView';
-import { CalendarTabIcon, CircleTabIcon, DiaryTabIcon } from './src/components/TabIcons';
+import AboutSheet from './src/components/AboutSheet';
+import { CalendarTabIcon, CircleTabIcon, DiaryTabIcon, InfoIcon } from './src/components/TabIcons';
 import { addDays, dateKey, fromKey, nowMinutes, weekday } from './src/date';
-import { loadDiary, loadSchedules, saveDiary, saveSchedules } from './src/storage';
+import { clearAllData, loadDiary, loadSchedules, saveDiary, saveSchedules } from './src/storage';
 import { DiaryEntry, DiaryMap, ScheduleEvent, ScheduleMap } from './src/types';
 import { colors } from './src/theme';
 
@@ -43,6 +44,18 @@ function Main() {
 
   const [diary, setDiary] = useState<DiaryMap>({});
   const [diaryLoaded, setDiaryLoaded] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
+  // 日記の写真は日ごとに読み込むので、全部消したときに読み直させるための番号
+  const [dataVersion, setDataVersion] = useState(0);
+
+  const deleteAll = async () => {
+    await clearAllData();
+    setSchedules({});
+    setDiary({});
+    setUndo(null);
+    setToast(null);
+    setDataVersion((v) => v + 1);
+  };
 
   useEffect(() => {
     loadSchedules().then((s) => {
@@ -164,6 +177,9 @@ function Main() {
               <Text style={styles.kicker}>{dayLabel ? (dayLabel === '今日' ? 'TODAY' : 'TOMORROW') : 'SCHEDULE'}</Text>
               <Text style={styles.date}>{dateTitle}</Text>
             </View>
+            <Pressable onPress={() => setAboutOpen(true)} style={styles.info} hitSlop={8} accessibilityLabel="アプリについて">
+              <InfoIcon color={colors.textSub} />
+            </Pressable>
           </View>
 
           <View style={styles.segment}>
@@ -187,7 +203,7 @@ function Main() {
           </View>
 
           {tab === 'diary' ? (
-            <DiaryView diary={diary} selectedKey={selectedKey} onChange={changeDiary} onSelect={setSelectedKey} />
+            <DiaryView key={dataVersion} diary={diary} selectedKey={selectedKey} onChange={changeDiary} onSelect={setSelectedKey} />
           ) : tab === 'circle' ? (
             <View style={styles.circleWrap}>
               <CircleSchedule
@@ -288,6 +304,8 @@ function Main() {
         onClose={() => setEditorOpen(false)}
       />
 
+      <AboutSheet visible={aboutOpen} onClose={() => setAboutOpen(false)} onDeleteAll={deleteAll} />
+
     </SafeAreaView>
   );
 }
@@ -304,6 +322,16 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   scroll: { padding: 20, paddingBottom: 140, width: '100%', maxWidth: 560, alignSelf: 'center' },
   headerRow: { flexDirection: 'row', alignItems: 'center' },
+  info: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   kicker: { color: colors.accent, fontSize: 12, fontWeight: '700', letterSpacing: 5 },
   date: { color: colors.text, fontSize: 30, fontWeight: '800', marginTop: 4 },
   segment: {

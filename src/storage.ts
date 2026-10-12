@@ -59,3 +59,14 @@ export async function saveDiaryPhotos(dayKey: string, photos: DiaryPhoto[]): Pro
     // 保存できなくてもアプリは動かし続ける
   }
 }
+
+/** この端末に保存した予定・日記・写真をすべて消す */
+export async function clearAllData(): Promise<void> {
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const ours = keys.filter((k) => k === KEY || k === DIARY_KEY || k.startsWith('diaryPhotos.v1:'));
+    if (ours.length) await AsyncStorage.multiRemove(ours);
+  } catch {
+    // 消せなかったものは次回また消せる
+  }
+}

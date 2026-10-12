@@ -3,8 +3,8 @@
 
 
 // ../../../../../../home/claude/schedule-app/App.tsx
-import { useEffect as useEffect3, useMemo as useMemo2, useRef as useRef2, useState as useState4 } from "react";
-import { KeyboardAvoidingView as KeyboardAvoidingView2, Platform as Platform2, Pressable as Pressable5, ScrollView as ScrollView2, StyleSheet as StyleSheet6, Text as Text6, useWindowDimensions as useWindowDimensions2, View as View6 } from "react-native";
+import { useEffect as useEffect4, useMemo as useMemo2, useRef as useRef2, useState as useState5 } from "react";
+import { KeyboardAvoidingView as KeyboardAvoidingView2, Platform as Platform2, Pressable as Pressable6, ScrollView as ScrollView3, StyleSheet as StyleSheet7, Text as Text7, useWindowDimensions as useWindowDimensions2, View as View7 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
@@ -627,6 +627,14 @@ async function saveDiaryPhotos(dayKey, photos) {
   } catch {
   }
 }
+async function clearAllData() {
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const ours = keys.filter((k) => k === KEY || k === DIARY_KEY || k.startsWith("diaryPhotos.v1:"));
+    if (ours.length) await AsyncStorage.multiRemove(ours);
+  } catch {
+  }
+}
 
 // ../../../../../../home/claude/schedule-app/src/components/MoodFace.tsx
 import Svg2, { Circle as Circle2, Path as Path2 } from "react-native-svg";
@@ -909,39 +917,160 @@ var styles5 = StyleSheet5.create({
   itemText: { color: colors.text, fontSize: 15, marginTop: 2 }
 });
 
+// ../../../../../../home/claude/schedule-app/src/components/AboutSheet.tsx
+import { useEffect as useEffect3, useState as useState4 } from "react";
+import { Linking, Modal as Modal3, Pressable as Pressable5, ScrollView as ScrollView2, StyleSheet as StyleSheet6, Text as Text6, View as View6 } from "react-native";
+
+// ../../../../../../home/claude/schedule-app/src/appInfo.ts
+var APP_NAME = "Timeline";
+var APP_VERSION = "1.0.0";
+var REPO = "https://github.com/koutaishikawa724-alt/timeline-schedule-app";
+var PRIVACY_URL = `${REPO}/blob/main/PRIVACY.md`;
+var SUPPORT_URL = `${REPO}/issues`;
+
+// ../../../../../../home/claude/schedule-app/src/components/AboutSheet.tsx
+import { Fragment as Fragment3, jsx as jsx7, jsxs as jsxs7 } from "react/jsx-runtime";
+function AboutSheet({ visible, onClose, onDeleteAll }) {
+  const [confirming, setConfirming] = useState4(false);
+  const [deleted, setDeleted] = useState4(false);
+  useEffect3(() => {
+    if (visible) {
+      setConfirming(false);
+      setDeleted(false);
+    }
+  }, [visible]);
+  const open = (url) => Linking.openURL(url).catch(() => {
+  });
+  return /* @__PURE__ */ jsx7(Modal3, { visible, transparent: true, animationType: "slide", onRequestClose: onClose, children: /* @__PURE__ */ jsxs7(View6, { style: styles6.backdrop, children: [
+    /* @__PURE__ */ jsx7(Pressable5, { style: StyleSheet6.absoluteFill, onPress: onClose }),
+    /* @__PURE__ */ jsxs7(View6, { style: styles6.sheet, children: [
+      /* @__PURE__ */ jsx7(View6, { style: styles6.grabber }),
+      /* @__PURE__ */ jsxs7(View6, { style: styles6.headerRow, children: [
+        /* @__PURE__ */ jsx7(Text6, { style: styles6.heading, children: "アプリについて" }),
+        /* @__PURE__ */ jsx7(Pressable5, { onPress: onClose, hitSlop: 10, children: /* @__PURE__ */ jsx7(Text6, { style: styles6.done, children: "閉じる" }) })
+      ] }),
+      /* @__PURE__ */ jsxs7(ScrollView2, { showsVerticalScrollIndicator: false, children: [
+        /* @__PURE__ */ jsxs7(View6, { style: styles6.app, children: [
+          /* @__PURE__ */ jsx7(Text6, { style: styles6.appName, children: APP_NAME }),
+          /* @__PURE__ */ jsxs7(Text6, { style: styles6.version, children: [
+            "バージョン ",
+            APP_VERSION
+          ] })
+        ] }),
+        /* @__PURE__ */ jsx7(Text6, { style: styles6.label, children: "データについて" }),
+        /* @__PURE__ */ jsx7(View6, { style: styles6.card, children: /* @__PURE__ */ jsx7(Text6, { style: styles6.body, children: "予定・日記・写真は、このiPhoneの中だけに保存されます。アカウント登録はなく、データが外部に送られることはありません。" }) }),
+        /* @__PURE__ */ jsx7(Text6, { style: styles6.label, children: "サポート" }),
+        /* @__PURE__ */ jsxs7(View6, { style: styles6.card, children: [
+          /* @__PURE__ */ jsx7(Row, { label: "プライバシーポリシー", onPress: () => open(PRIVACY_URL) }),
+          /* @__PURE__ */ jsx7(View6, { style: styles6.divider }),
+          /* @__PURE__ */ jsx7(Row, { label: "お問い合わせ・不具合の報告", onPress: () => open(SUPPORT_URL) })
+        ] }),
+        /* @__PURE__ */ jsx7(Text6, { style: styles6.label, children: "データの削除" }),
+        /* @__PURE__ */ jsx7(View6, { style: styles6.card, children: deleted ? /* @__PURE__ */ jsx7(Text6, { style: styles6.body, children: "すべてのデータを消しました。" }) : /* @__PURE__ */ jsxs7(Fragment3, { children: [
+          /* @__PURE__ */ jsx7(Text6, { style: styles6.body, children: confirming ? "本当に消しますか？ 予定・日記・写真がすべて消え、元に戻せません。" : "このiPhoneに保存した予定・日記・写真をすべて消します。" }),
+          /* @__PURE__ */ jsxs7(View6, { style: styles6.deleteRow, children: [
+            confirming && /* @__PURE__ */ jsx7(Pressable5, { onPress: () => setConfirming(false), style: [styles6.button, styles6.cancel], children: /* @__PURE__ */ jsx7(Text6, { style: [styles6.buttonText, { color: colors.textSub }], children: "やめる" }) }),
+            /* @__PURE__ */ jsx7(
+              Pressable5,
+              {
+                onPress: async () => {
+                  if (!confirming) return setConfirming(true);
+                  await onDeleteAll();
+                  setDeleted(true);
+                },
+                style: [styles6.button, confirming ? styles6.dangerSolid : styles6.danger],
+                children: /* @__PURE__ */ jsx7(Text6, { style: [styles6.buttonText, { color: confirming ? "#fff" : colors.danger }], children: confirming ? "すべて消す" : "すべてのデータを消す" })
+              }
+            )
+          ] })
+        ] }) })
+      ] })
+    ] })
+  ] }) });
+}
+function Row({ label, onPress }) {
+  return /* @__PURE__ */ jsxs7(Pressable5, { onPress, style: styles6.row, children: [
+    /* @__PURE__ */ jsx7(Text6, { style: styles6.rowText, children: label }),
+    /* @__PURE__ */ jsx7(Text6, { style: styles6.chevron, children: "›" })
+  ] });
+}
+var styles6 = StyleSheet6.create({
+  backdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.55)" },
+  sheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 20,
+    paddingBottom: 36,
+    borderWidth: 1,
+    borderColor: colors.border,
+    width: "100%",
+    maxWidth: 560,
+    maxHeight: "88%",
+    alignSelf: "center"
+  },
+  grabber: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: "center", marginBottom: 14 },
+  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
+  heading: { color: colors.text, fontSize: 18, fontWeight: "700" },
+  done: { color: colors.accent, fontSize: 16, fontWeight: "700" },
+  app: { alignItems: "center", paddingVertical: 18 },
+  appName: { color: colors.text, fontSize: 22, fontWeight: "800", letterSpacing: 1 },
+  version: { color: colors.textMuted, fontSize: 12, marginTop: 4 },
+  label: { color: colors.textSub, fontSize: 12, marginTop: 18, marginBottom: 8, letterSpacing: 1, fontWeight: "700" },
+  card: { backgroundColor: colors.surfaceHigh, borderRadius: 14, padding: 14 },
+  body: { color: colors.textSub, fontSize: 14, lineHeight: 21 },
+  row: { flexDirection: "row", alignItems: "center", paddingVertical: 6 },
+  rowText: { flex: 1, color: colors.text, fontSize: 15 },
+  chevron: { color: colors.textMuted, fontSize: 20 },
+  divider: { height: 1, backgroundColor: colors.border, marginVertical: 8 },
+  deleteRow: { flexDirection: "row", gap: 8, marginTop: 12 },
+  button: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: "center" },
+  cancel: { backgroundColor: colors.surface },
+  danger: { backgroundColor: "rgba(255,92,122,0.12)" },
+  dangerSolid: { backgroundColor: colors.danger },
+  buttonText: { fontSize: 15, fontWeight: "700" }
+});
+
 // ../../../../../../home/claude/schedule-app/src/components/TabIcons.tsx
 import Svg3, { Circle as Circle3, Line as Line2, Path as Path3, Rect } from "react-native-svg";
-import { jsx as jsx7, jsxs as jsxs7 } from "react/jsx-runtime";
+import { jsx as jsx8, jsxs as jsxs8 } from "react/jsx-runtime";
 function CircleTabIcon({ color }) {
-  return /* @__PURE__ */ jsxs7(Svg3, { width: 24, height: 24, viewBox: "0 0 24 24", children: [
-    /* @__PURE__ */ jsx7(Circle3, { cx: 12, cy: 12, r: 8.5, stroke: color, strokeWidth: 2, fill: "none", opacity: 0.45 }),
-    /* @__PURE__ */ jsx7(Path3, { d: "M12 3.5 A8.5 8.5 0 0 1 20.5 12", stroke: color, strokeWidth: 2.4, fill: "none", strokeLinecap: "round" }),
-    /* @__PURE__ */ jsx7(Line2, { x1: 12, y1: 12, x2: 12, y2: 7, stroke: color, strokeWidth: 2, strokeLinecap: "round" }),
-    /* @__PURE__ */ jsx7(Line2, { x1: 12, y1: 12, x2: 15, y2: 14, stroke: color, strokeWidth: 2, strokeLinecap: "round" })
+  return /* @__PURE__ */ jsxs8(Svg3, { width: 24, height: 24, viewBox: "0 0 24 24", children: [
+    /* @__PURE__ */ jsx8(Circle3, { cx: 12, cy: 12, r: 8.5, stroke: color, strokeWidth: 2, fill: "none", opacity: 0.45 }),
+    /* @__PURE__ */ jsx8(Path3, { d: "M12 3.5 A8.5 8.5 0 0 1 20.5 12", stroke: color, strokeWidth: 2.4, fill: "none", strokeLinecap: "round" }),
+    /* @__PURE__ */ jsx8(Line2, { x1: 12, y1: 12, x2: 12, y2: 7, stroke: color, strokeWidth: 2, strokeLinecap: "round" }),
+    /* @__PURE__ */ jsx8(Line2, { x1: 12, y1: 12, x2: 15, y2: 14, stroke: color, strokeWidth: 2, strokeLinecap: "round" })
   ] });
 }
 function CalendarTabIcon({ color }) {
-  return /* @__PURE__ */ jsxs7(Svg3, { width: 24, height: 24, viewBox: "0 0 24 24", children: [
-    /* @__PURE__ */ jsx7(Rect, { x: 3.5, y: 5, width: 17, height: 15, rx: 3, stroke: color, strokeWidth: 2, fill: "none" }),
-    /* @__PURE__ */ jsx7(Line2, { x1: 3.5, y1: 10, x2: 20.5, y2: 10, stroke: color, strokeWidth: 2 }),
-    /* @__PURE__ */ jsx7(Line2, { x1: 8, y1: 3, x2: 8, y2: 7, stroke: color, strokeWidth: 2, strokeLinecap: "round" }),
-    /* @__PURE__ */ jsx7(Line2, { x1: 16, y1: 3, x2: 16, y2: 7, stroke: color, strokeWidth: 2, strokeLinecap: "round" })
+  return /* @__PURE__ */ jsxs8(Svg3, { width: 24, height: 24, viewBox: "0 0 24 24", children: [
+    /* @__PURE__ */ jsx8(Rect, { x: 3.5, y: 5, width: 17, height: 15, rx: 3, stroke: color, strokeWidth: 2, fill: "none" }),
+    /* @__PURE__ */ jsx8(Line2, { x1: 3.5, y1: 10, x2: 20.5, y2: 10, stroke: color, strokeWidth: 2 }),
+    /* @__PURE__ */ jsx8(Line2, { x1: 8, y1: 3, x2: 8, y2: 7, stroke: color, strokeWidth: 2, strokeLinecap: "round" }),
+    /* @__PURE__ */ jsx8(Line2, { x1: 16, y1: 3, x2: 16, y2: 7, stroke: color, strokeWidth: 2, strokeLinecap: "round" })
   ] });
 }
 function DiaryTabIcon({ color }) {
-  return /* @__PURE__ */ jsxs7(Svg3, { width: 24, height: 24, viewBox: "0 0 24 24", children: [
-    /* @__PURE__ */ jsx7(Rect, { x: 5, y: 3.5, width: 14, height: 17, rx: 2.5, stroke: color, strokeWidth: 2, fill: "none" }),
-    /* @__PURE__ */ jsx7(Line2, { x1: 8.5, y1: 8.5, x2: 15.5, y2: 8.5, stroke: color, strokeWidth: 2, strokeLinecap: "round" }),
-    /* @__PURE__ */ jsx7(Line2, { x1: 8.5, y1: 12, x2: 15.5, y2: 12, stroke: color, strokeWidth: 2, strokeLinecap: "round" }),
-    /* @__PURE__ */ jsx7(Line2, { x1: 8.5, y1: 15.5, x2: 12.5, y2: 15.5, stroke: color, strokeWidth: 2, strokeLinecap: "round" })
+  return /* @__PURE__ */ jsxs8(Svg3, { width: 24, height: 24, viewBox: "0 0 24 24", children: [
+    /* @__PURE__ */ jsx8(Rect, { x: 5, y: 3.5, width: 14, height: 17, rx: 2.5, stroke: color, strokeWidth: 2, fill: "none" }),
+    /* @__PURE__ */ jsx8(Line2, { x1: 8.5, y1: 8.5, x2: 15.5, y2: 8.5, stroke: color, strokeWidth: 2, strokeLinecap: "round" }),
+    /* @__PURE__ */ jsx8(Line2, { x1: 8.5, y1: 12, x2: 15.5, y2: 12, stroke: color, strokeWidth: 2, strokeLinecap: "round" }),
+    /* @__PURE__ */ jsx8(Line2, { x1: 8.5, y1: 15.5, x2: 12.5, y2: 15.5, stroke: color, strokeWidth: 2, strokeLinecap: "round" })
+  ] });
+}
+function InfoIcon({ color }) {
+  return /* @__PURE__ */ jsxs8(Svg3, { width: 22, height: 22, viewBox: "0 0 24 24", children: [
+    /* @__PURE__ */ jsx8(Circle3, { cx: 12, cy: 12, r: 9, stroke: color, strokeWidth: 2, fill: "none" }),
+    /* @__PURE__ */ jsx8(Line2, { x1: 12, y1: 11, x2: 12, y2: 16.5, stroke: color, strokeWidth: 2, strokeLinecap: "round" }),
+    /* @__PURE__ */ jsx8(Circle3, { cx: 12, cy: 7.6, r: 1.2, fill: color })
   ] });
 }
 
 // ../../../../../../home/claude/schedule-app/App.tsx
-import { Fragment as Fragment3, jsx as jsx8, jsxs as jsxs8 } from "react/jsx-runtime";
+import { Fragment as Fragment4, jsx as jsx9, jsxs as jsxs9 } from "react/jsx-runtime";
 function useNow() {
-  const [now, setNow] = useState4(() => /* @__PURE__ */ new Date());
-  useEffect3(() => {
+  const [now, setNow] = useState5(() => /* @__PURE__ */ new Date());
+  useEffect4(() => {
     const t = setInterval(() => setNow(/* @__PURE__ */ new Date()), 3e4);
     return () => clearInterval(t);
   }, []);
@@ -952,18 +1081,28 @@ function Main() {
   const now = useNow();
   const todayKey = dateKey(now);
   const tomorrowKey = dateKey(addDays(now, 1));
-  const [schedules, setSchedules] = useState4({});
-  const [loaded, setLoaded] = useState4(false);
-  const [selectedKey, setSelectedKey] = useState4(todayKey);
-  const [tab, setTab] = useState4("circle");
-  const [editing, setEditing] = useState4();
-  const [editorOpen, setEditorOpen] = useState4(false);
-  const [toast, setToast] = useState4(null);
-  const [undo, setUndo] = useState4(null);
+  const [schedules, setSchedules] = useState5({});
+  const [loaded, setLoaded] = useState5(false);
+  const [selectedKey, setSelectedKey] = useState5(todayKey);
+  const [tab, setTab] = useState5("circle");
+  const [editing, setEditing] = useState5();
+  const [editorOpen, setEditorOpen] = useState5(false);
+  const [toast, setToast] = useState5(null);
+  const [undo, setUndo] = useState5(null);
   const toastTimer = useRef2(null);
-  const [diary, setDiary] = useState4({});
-  const [diaryLoaded, setDiaryLoaded] = useState4(false);
-  useEffect3(() => {
+  const [diary, setDiary] = useState5({});
+  const [diaryLoaded, setDiaryLoaded] = useState5(false);
+  const [aboutOpen, setAboutOpen] = useState5(false);
+  const [dataVersion, setDataVersion] = useState5(0);
+  const deleteAll = async () => {
+    await clearAllData();
+    setSchedules({});
+    setDiary({});
+    setUndo(null);
+    setToast(null);
+    setDataVersion((v) => v + 1);
+  };
+  useEffect4(() => {
     loadSchedules().then((s) => {
       setSchedules(s);
       setLoaded(true);
@@ -973,10 +1112,10 @@ function Main() {
       setDiaryLoaded(true);
     });
   }, []);
-  useEffect3(() => {
+  useEffect4(() => {
     if (loaded) saveSchedules(schedules);
   }, [schedules, loaded]);
-  useEffect3(() => {
+  useEffect4(() => {
     if (!diaryLoaded) return;
     const t = setTimeout(() => saveDiary(diary), 400);
     return () => clearTimeout(t);
@@ -994,9 +1133,9 @@ function Main() {
   const dateTitle = `${sel.getMonth() + 1}月${sel.getDate()}日（${weekday(sel)}）`;
   const nowMin = isToday ? nowMinutes(now) : void 0;
   const center = describeCenter(events, nowMin);
-  const [half, setHalf] = useState4(0);
+  const [half, setHalf] = useState5(0);
   const autoHalf = defaultHalf(events, nowMin);
-  useEffect3(() => {
+  useEffect4(() => {
     setHalf(autoHalf);
   }, [selectedKey]);
   const halfCounts = [0, 1].map((h) => events.filter((e) => e.end > h * 720 && e.start < (h + 1) * 720).length);
@@ -1050,37 +1189,40 @@ function Main() {
     if (last) return Math.min(last.end, 23 * 60);
     return isToday ? Math.min(Math.ceil(nowMinutes(now) / 60) * 60, 23 * 60) : 9 * 60;
   }, [events, isToday, now]);
-  return /* @__PURE__ */ jsxs8(SafeAreaView, { style: styles6.root, edges: ["top", "left", "right"], children: [
-    /* @__PURE__ */ jsx8(StatusBar, { style: "light" }),
-    /* @__PURE__ */ jsx8(KeyboardAvoidingView2, { style: { flex: 1 }, behavior: Platform2.OS === "ios" ? "padding" : void 0, children: /* @__PURE__ */ jsxs8(
-      ScrollView2,
+  return /* @__PURE__ */ jsxs9(SafeAreaView, { style: styles7.root, edges: ["top", "left", "right"], children: [
+    /* @__PURE__ */ jsx9(StatusBar, { style: "light" }),
+    /* @__PURE__ */ jsx9(KeyboardAvoidingView2, { style: { flex: 1 }, behavior: Platform2.OS === "ios" ? "padding" : void 0, children: /* @__PURE__ */ jsxs9(
+      ScrollView3,
       {
-        contentContainerStyle: styles6.scroll,
+        contentContainerStyle: styles7.scroll,
         showsVerticalScrollIndicator: false,
         keyboardShouldPersistTaps: "handled",
         keyboardDismissMode: "interactive",
         children: [
-          /* @__PURE__ */ jsx8(View6, { style: styles6.headerRow, children: /* @__PURE__ */ jsxs8(View6, { style: { flex: 1 }, children: [
-            /* @__PURE__ */ jsx8(Text6, { style: styles6.kicker, children: dayLabel ? dayLabel === "今日" ? "TODAY" : "TOMORROW" : "SCHEDULE" }),
-            /* @__PURE__ */ jsx8(Text6, { style: styles6.date, children: dateTitle })
-          ] }) }),
-          /* @__PURE__ */ jsxs8(View6, { style: styles6.segment, children: [
+          /* @__PURE__ */ jsxs9(View7, { style: styles7.headerRow, children: [
+            /* @__PURE__ */ jsxs9(View7, { style: { flex: 1 }, children: [
+              /* @__PURE__ */ jsx9(Text7, { style: styles7.kicker, children: dayLabel ? dayLabel === "今日" ? "TODAY" : "TOMORROW" : "SCHEDULE" }),
+              /* @__PURE__ */ jsx9(Text7, { style: styles7.date, children: dateTitle })
+            ] }),
+            /* @__PURE__ */ jsx9(Pressable6, { onPress: () => setAboutOpen(true), style: styles7.info, hitSlop: 8, accessibilityLabel: "アプリについて", children: /* @__PURE__ */ jsx9(InfoIcon, { color: colors.textSub }) })
+          ] }),
+          /* @__PURE__ */ jsxs9(View7, { style: styles7.segment, children: [
             [
               { key: todayKey, label: "今日" },
               { key: tomorrowKey, label: "明日" }
-            ].map((s) => /* @__PURE__ */ jsx8(
-              Pressable5,
+            ].map((s) => /* @__PURE__ */ jsx9(
+              Pressable6,
               {
                 onPress: () => setSelectedKey(s.key),
-                style: [styles6.segItem, selectedKey === s.key && styles6.segActive],
-                children: /* @__PURE__ */ jsx8(Text6, { style: [styles6.segText, selectedKey === s.key && styles6.segTextActive], children: s.label })
+                style: [styles7.segItem, selectedKey === s.key && styles7.segActive],
+                children: /* @__PURE__ */ jsx9(Text7, { style: [styles7.segText, selectedKey === s.key && styles7.segTextActive], children: s.label })
               },
               s.key
             )),
-            !dayLabel && /* @__PURE__ */ jsx8(View6, { style: [styles6.segItem, styles6.segActive], children: /* @__PURE__ */ jsx8(Text6, { style: [styles6.segText, styles6.segTextActive], children: `${sel.getMonth() + 1}/${sel.getDate()}` }) })
+            !dayLabel && /* @__PURE__ */ jsx9(View7, { style: [styles7.segItem, styles7.segActive], children: /* @__PURE__ */ jsx9(Text7, { style: [styles7.segText, styles7.segTextActive], children: `${sel.getMonth() + 1}/${sel.getDate()}` }) })
           ] }),
-          tab === "diary" ? /* @__PURE__ */ jsx8(DiaryView, { diary, selectedKey, onChange: changeDiary, onSelect: setSelectedKey }) : tab === "circle" ? /* @__PURE__ */ jsxs8(View6, { style: styles6.circleWrap, children: [
-            /* @__PURE__ */ jsx8(
+          tab === "diary" ? /* @__PURE__ */ jsx9(DiaryView, { diary, selectedKey, onChange: changeDiary, onSelect: setSelectedKey }, dataVersion) : tab === "circle" ? /* @__PURE__ */ jsxs9(View7, { style: styles7.circleWrap, children: [
+            /* @__PURE__ */ jsx9(
               CircleSchedule,
               {
                 events,
@@ -1092,19 +1234,19 @@ function Main() {
                 half
               }
             ),
-            /* @__PURE__ */ jsx8(View6, { style: styles6.halfSwitch, children: ["午前", "午後"].map((label, h) => /* @__PURE__ */ jsx8(
-              Pressable5,
+            /* @__PURE__ */ jsx9(View7, { style: styles7.halfSwitch, children: ["午前", "午後"].map((label, h) => /* @__PURE__ */ jsx9(
+              Pressable6,
               {
                 onPress: () => setHalf(h),
-                style: [styles6.halfItem, half === h && styles6.halfActive],
-                children: /* @__PURE__ */ jsxs8(Text6, { style: [styles6.halfText, half === h && styles6.halfTextActive], children: [
+                style: [styles7.halfItem, half === h && styles7.halfActive],
+                children: /* @__PURE__ */ jsxs9(Text7, { style: [styles7.halfText, half === h && styles7.halfTextActive], children: [
                   label,
                   halfCounts[h] ? `  ${halfCounts[h]}件` : ""
                 ] })
               },
               label
             )) })
-          ] }) : /* @__PURE__ */ jsx8(View6, { style: { marginTop: 18 }, children: /* @__PURE__ */ jsx8(
+          ] }) : /* @__PURE__ */ jsx9(View7, { style: { marginTop: 18 }, children: /* @__PURE__ */ jsx9(
             CalendarView,
             {
               schedules,
@@ -1113,31 +1255,31 @@ function Main() {
               onSelect: setSelectedKey
             }
           ) }),
-          tab !== "diary" && /* @__PURE__ */ jsxs8(Fragment3, { children: [
-            /* @__PURE__ */ jsxs8(View6, { style: styles6.sectionRow, children: [
-              /* @__PURE__ */ jsx8(Text6, { style: styles6.section, children: "タイムライン" }),
-              events.length > 1 && /* @__PURE__ */ jsx8(Pressable5, { onPress: () => deleteEvents(), hitSlop: 8, children: /* @__PURE__ */ jsx8(Text6, { style: styles6.clearAll, children: "すべて消す" }) })
+          tab !== "diary" && /* @__PURE__ */ jsxs9(Fragment4, { children: [
+            /* @__PURE__ */ jsxs9(View7, { style: styles7.sectionRow, children: [
+              /* @__PURE__ */ jsx9(Text7, { style: styles7.section, children: "タイムライン" }),
+              events.length > 1 && /* @__PURE__ */ jsx9(Pressable6, { onPress: () => deleteEvents(), hitSlop: 8, children: /* @__PURE__ */ jsx9(Text7, { style: styles7.clearAll, children: "すべて消す" }) })
             ] }),
-            /* @__PURE__ */ jsx8(EventList, { events, nowMin, onPress: openEdit, onDelete: handleDelete })
+            /* @__PURE__ */ jsx9(EventList, { events, nowMin, onPress: openEdit, onDelete: handleDelete })
           ] })
         ]
       }
     ) }),
-    toast === "saved" && /* @__PURE__ */ jsx8(View6, { style: styles6.toast, children: /* @__PURE__ */ jsx8(Text6, { style: styles6.toastText, children: "スケジュールを更新しました" }) }),
-    toast === "deleted" && undo && /* @__PURE__ */ jsxs8(View6, { style: styles6.toast, children: [
-      /* @__PURE__ */ jsx8(Text6, { style: [styles6.toastText, { flex: 1 }], numberOfLines: 1, children: undo.label }),
-      /* @__PURE__ */ jsx8(Pressable5, { onPress: undoDelete, hitSlop: 8, children: /* @__PURE__ */ jsx8(Text6, { style: styles6.toastAction, children: "元に戻す" }) })
+    toast === "saved" && /* @__PURE__ */ jsx9(View7, { style: styles7.toast, children: /* @__PURE__ */ jsx9(Text7, { style: styles7.toastText, children: "スケジュールを更新しました" }) }),
+    toast === "deleted" && undo && /* @__PURE__ */ jsxs9(View7, { style: styles7.toast, children: [
+      /* @__PURE__ */ jsx9(Text7, { style: [styles7.toastText, { flex: 1 }], numberOfLines: 1, children: undo.label }),
+      /* @__PURE__ */ jsx9(Pressable6, { onPress: undoDelete, hitSlop: 8, children: /* @__PURE__ */ jsx9(Text7, { style: styles7.toastAction, children: "元に戻す" }) })
     ] }),
-    tab !== "diary" && /* @__PURE__ */ jsx8(Pressable5, { onPress: openNew, style: styles6.fab, children: /* @__PURE__ */ jsx8(Text6, { style: styles6.fabText, children: "＋" }) }),
-    /* @__PURE__ */ jsx8(SafeAreaView, { edges: ["bottom"], style: styles6.tabBar, children: [
+    tab !== "diary" && /* @__PURE__ */ jsx9(Pressable6, { onPress: openNew, style: styles7.fab, children: /* @__PURE__ */ jsx9(Text7, { style: styles7.fabText, children: "＋" }) }),
+    /* @__PURE__ */ jsx9(SafeAreaView, { edges: ["bottom"], style: styles7.tabBar, children: [
       { key: "circle", label: "サークル", Icon: CircleTabIcon },
       { key: "calendar", label: "カレンダー", Icon: CalendarTabIcon },
       { key: "diary", label: "日記", Icon: DiaryTabIcon }
-    ].map((t) => /* @__PURE__ */ jsxs8(Pressable5, { onPress: () => setTab(t.key), style: styles6.tabItem, children: [
-      /* @__PURE__ */ jsx8(t.Icon, { color: tab === t.key ? colors.accent : colors.textMuted }),
-      /* @__PURE__ */ jsx8(Text6, { style: [styles6.tabLabel, tab === t.key && { color: colors.text }], children: t.label })
+    ].map((t) => /* @__PURE__ */ jsxs9(Pressable6, { onPress: () => setTab(t.key), style: styles7.tabItem, children: [
+      /* @__PURE__ */ jsx9(t.Icon, { color: tab === t.key ? colors.accent : colors.textMuted }),
+      /* @__PURE__ */ jsx9(Text7, { style: [styles7.tabLabel, tab === t.key && { color: colors.text }], children: t.label })
     ] }, t.key)) }),
-    /* @__PURE__ */ jsx8(
+    /* @__PURE__ */ jsx9(
       EventEditor,
       {
         visible: editorOpen,
@@ -1148,16 +1290,27 @@ function Main() {
         onDelete: handleDelete,
         onClose: () => setEditorOpen(false)
       }
-    )
+    ),
+    /* @__PURE__ */ jsx9(AboutSheet, { visible: aboutOpen, onClose: () => setAboutOpen(false), onDeleteAll: deleteAll })
   ] });
 }
 function App() {
-  return /* @__PURE__ */ jsx8(SafeAreaProvider, { children: /* @__PURE__ */ jsx8(Main, {}) });
+  return /* @__PURE__ */ jsx9(SafeAreaProvider, { children: /* @__PURE__ */ jsx9(Main, {}) });
 }
-var styles6 = StyleSheet6.create({
+var styles7 = StyleSheet7.create({
   root: { flex: 1, backgroundColor: colors.bg },
   scroll: { padding: 20, paddingBottom: 140, width: "100%", maxWidth: 560, alignSelf: "center" },
   headerRow: { flexDirection: "row", alignItems: "center" },
+  info: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center"
+  },
   kicker: { color: colors.accent, fontSize: 12, fontWeight: "700", letterSpacing: 5 },
   date: { color: colors.text, fontSize: 30, fontWeight: "800", marginTop: 4 },
   segment: {
