@@ -3,6 +3,7 @@ import { Image, Keyboard, Modal, Pressable, StyleSheet, Text, TextInput, useWind
 import * as ImagePicker from 'expo-image-picker';
 import { DiaryEntry, DiaryMap, DiaryPhoto } from '../types';
 import { loadDiaryPhotos, saveDiaryPhotos } from '../storage';
+import MoodFace from './MoodFace';
 import { colors } from '../theme';
 import { addDays, dateKey, fromKey, weekday } from '../date';
 
@@ -13,13 +14,7 @@ type Props = {
   onSelect: (key: string) => void;
 };
 
-export const MOODS = [
-  { emoji: '😄', label: '最高' },
-  { emoji: '🙂', label: 'いい' },
-  { emoji: '😐', label: 'ふつう' },
-  { emoji: '😔', label: 'いまいち' },
-  { emoji: '😫', label: 'つらい' },
-];
+export const MOODS = ['最高', 'いい', 'ふつう', 'いまいち', 'つらい'];
 
 const shortDate = (key: string) => {
   const d = fromKey(key);
@@ -116,16 +111,16 @@ export default function DiaryView({ diary, selectedKey, onChange, onSelect }: Pr
 
       <Text style={styles.label}>気分</Text>
       <View style={styles.moods}>
-        {MOODS.map((m, i) => {
+        {MOODS.map((label, i) => {
           const active = entry?.mood === i;
           return (
             <Pressable
-              key={m.label}
+              key={label}
               onPress={() => update({ mood: active ? undefined : i })}
               style={[styles.mood, active && styles.moodActive]}
             >
-              <Text style={[styles.moodEmoji, !active && entry?.mood !== undefined && { opacity: 0.4 }]}>{m.emoji}</Text>
-              <Text style={[styles.moodLabel, active && { color: colors.text }]}>{m.label}</Text>
+              <MoodFace level={i} color={active ? colors.accent : colors.textSub} />
+              <Text style={[styles.moodLabel, active && { color: colors.text }]}>{label}</Text>
             </Pressable>
           );
         })}
@@ -199,11 +194,15 @@ export default function DiaryView({ diary, selectedKey, onChange, onSelect }: Pr
             const first = e.text.trim().split('\n')[0];
             return (
               <Pressable key={k} onPress={() => onSelect(k)} style={styles.item}>
-                <Text style={styles.itemMood}>{e.mood !== undefined ? MOODS[e.mood].emoji : '📝'}</Text>
+                {e.mood !== undefined ? (
+                  <MoodFace level={e.mood} color={colors.textSub} size={26} />
+                ) : (
+                  <View style={styles.itemDot} />
+                )}
                 <View style={{ flex: 1 }}>
                   <Text style={styles.itemDate}>
                     {shortDate(k)}
-                    {e.photos ? `　📷 ${e.photos}枚` : ''}
+                    {e.photos ? `　写真 ${e.photos}枚` : ''}
                   </Text>
                   <Text style={styles.itemText} numberOfLines={1}>
                     {first || (e.photos ? '（写真だけ）' : '（気分だけ記録）')}
@@ -236,7 +235,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   moodActive: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
-  moodEmoji: { fontSize: 24 },
   moodLabel: { color: colors.textMuted, fontSize: 11, marginTop: 4, fontWeight: '600' },
   input: {
     minHeight: 220,
@@ -289,7 +287,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  itemMood: { fontSize: 22 },
+  itemDot: { width: 26, alignItems: 'center', height: 26, borderRadius: 13, borderWidth: 1.9, borderColor: colors.border },
   itemDate: { color: colors.textSub, fontSize: 12, fontWeight: '700' },
   itemText: { color: colors.text, fontSize: 15, marginTop: 2 },
 });

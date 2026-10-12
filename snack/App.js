@@ -628,15 +628,52 @@ async function saveDiaryPhotos(dayKey, photos) {
   }
 }
 
-// ../../../../../../home/claude/schedule-app/src/components/DiaryView.tsx
+// ../../../../../../home/claude/schedule-app/src/components/MoodFace.tsx
+import Svg2, { Circle as Circle2, Path as Path2 } from "react-native-svg";
 import { Fragment, jsx as jsx5, jsxs as jsxs5 } from "react/jsx-runtime";
-var MOODS = [
-  { emoji: "😄", label: "最高" },
-  { emoji: "🙂", label: "いい" },
-  { emoji: "😐", label: "ふつう" },
-  { emoji: "😔", label: "いまいち" },
-  { emoji: "😫", label: "つらい" }
-];
+function MoodFace({ level, color, size = 30 }) {
+  const s = { stroke: color, strokeWidth: 1.9, strokeLinecap: "round", strokeLinejoin: "round", fill: "none" };
+  const eyes = (() => {
+    switch (level) {
+      case 0:
+        return /* @__PURE__ */ jsxs5(Fragment, { children: [
+          /* @__PURE__ */ jsx5(Path2, { d: "M10.2 13.6 Q12 11.4 13.8 13.6", ...s }),
+          /* @__PURE__ */ jsx5(Path2, { d: "M18.2 13.6 Q20 11.4 21.8 13.6", ...s })
+        ] });
+      case 4:
+        return /* @__PURE__ */ jsxs5(Fragment, { children: [
+          /* @__PURE__ */ jsx5(Path2, { d: "M10.4 11.6 L13.4 13.1 L10.4 14.6", ...s }),
+          /* @__PURE__ */ jsx5(Path2, { d: "M21.6 11.6 L18.6 13.1 L21.6 14.6", ...s })
+        ] });
+      default:
+        return /* @__PURE__ */ jsxs5(Fragment, { children: [
+          /* @__PURE__ */ jsx5(Circle2, { cx: 12, cy: 13, r: 1.25, fill: color }),
+          /* @__PURE__ */ jsx5(Circle2, { cx: 20, cy: 13, r: 1.25, fill: color })
+        ] });
+    }
+  })();
+  const mouth = [
+    "M10.5 18.6 Q16 24.6 21.5 18.6",
+    // 大きな笑顔
+    "M11.8 19.4 Q16 22.6 20.2 19.4",
+    // ほほえみ
+    "M12.2 20.4 L19.8 20.2",
+    // まっすぐ
+    "M12 21.4 Q16 18.6 20 21.2",
+    // への字
+    "M11 21.2 Q12.8 19.4 14.6 21.2 Q16.4 23 18.2 21.2 Q19.6 19.8 21 21"
+    // 波線
+  ][level];
+  return /* @__PURE__ */ jsxs5(Svg2, { width: size, height: size, viewBox: "0 0 32 32", children: [
+    /* @__PURE__ */ jsx5(Path2, { d: "M16 3.2 C23.4 3.1 28.9 8.6 28.8 16.1 C28.7 23.5 23.3 28.9 15.8 28.8 C8.5 28.7 3.1 23.2 3.2 15.9 C3.3 8.6 8.7 3.3 16 3.2 Z", ...s }),
+    eyes,
+    /* @__PURE__ */ jsx5(Path2, { d: mouth, ...s })
+  ] });
+}
+
+// ../../../../../../home/claude/schedule-app/src/components/DiaryView.tsx
+import { Fragment as Fragment2, jsx as jsx6, jsxs as jsxs6 } from "react/jsx-runtime";
+var MOODS = ["最高", "いい", "ふつう", "いまいち", "つらい"];
 var shortDate = (key) => {
   const d = fromKey(key);
   return `${d.getMonth() + 1}/${d.getDate()}（${weekday(d)}）`;
@@ -700,38 +737,38 @@ function DiaryView({ diary, selectedKey, onChange, onSelect }) {
   const prevKey = dateKey(addDays(sel, -1));
   const nextKey = dateKey(addDays(sel, 1));
   const recent = Object.keys(diary).filter((k) => k !== selectedKey).sort((a, b) => a < b ? 1 : -1).slice(0, 10);
-  return /* @__PURE__ */ jsxs5(View5, { style: { marginTop: 18 }, children: [
-    /* @__PURE__ */ jsxs5(View5, { style: styles5.nav, children: [
-      /* @__PURE__ */ jsx5(Pressable4, { onPress: () => onSelect(prevKey), hitSlop: 8, style: styles5.navBtn, children: /* @__PURE__ */ jsxs5(Text5, { style: styles5.navText, children: [
+  return /* @__PURE__ */ jsxs6(View5, { style: { marginTop: 18 }, children: [
+    /* @__PURE__ */ jsxs6(View5, { style: styles5.nav, children: [
+      /* @__PURE__ */ jsx6(Pressable4, { onPress: () => onSelect(prevKey), hitSlop: 8, style: styles5.navBtn, children: /* @__PURE__ */ jsxs6(Text5, { style: styles5.navText, children: [
         "‹ ",
         shortDate(prevKey)
       ] }) }),
-      /* @__PURE__ */ jsx5(Pressable4, { onPress: () => onSelect(nextKey), hitSlop: 8, style: styles5.navBtn, children: /* @__PURE__ */ jsxs5(Text5, { style: styles5.navText, children: [
+      /* @__PURE__ */ jsx6(Pressable4, { onPress: () => onSelect(nextKey), hitSlop: 8, style: styles5.navBtn, children: /* @__PURE__ */ jsxs6(Text5, { style: styles5.navText, children: [
         shortDate(nextKey),
         " ›"
       ] }) })
     ] }),
-    /* @__PURE__ */ jsx5(Text5, { style: styles5.label, children: "気分" }),
-    /* @__PURE__ */ jsx5(View5, { style: styles5.moods, children: MOODS.map((m, i) => {
+    /* @__PURE__ */ jsx6(Text5, { style: styles5.label, children: "気分" }),
+    /* @__PURE__ */ jsx6(View5, { style: styles5.moods, children: MOODS.map((label, i) => {
       const active = entry?.mood === i;
-      return /* @__PURE__ */ jsxs5(
+      return /* @__PURE__ */ jsxs6(
         Pressable4,
         {
           onPress: () => update({ mood: active ? void 0 : i }),
           style: [styles5.mood, active && styles5.moodActive],
           children: [
-            /* @__PURE__ */ jsx5(Text5, { style: [styles5.moodEmoji, !active && entry?.mood !== void 0 && { opacity: 0.4 }], children: m.emoji }),
-            /* @__PURE__ */ jsx5(Text5, { style: [styles5.moodLabel, active && { color: colors.text }], children: m.label })
+            /* @__PURE__ */ jsx6(MoodFace, { level: i, color: active ? colors.accent : colors.textSub }),
+            /* @__PURE__ */ jsx6(Text5, { style: [styles5.moodLabel, active && { color: colors.text }], children: label })
           ]
         },
-        m.label
+        label
       );
     }) }),
-    /* @__PURE__ */ jsxs5(View5, { style: styles5.labelRow, children: [
-      /* @__PURE__ */ jsx5(Text5, { style: styles5.label, children: "日記" }),
-      focused && /* @__PURE__ */ jsx5(Pressable4, { onPress: () => Keyboard2.dismiss(), hitSlop: 8, children: /* @__PURE__ */ jsx5(Text5, { style: styles5.done, children: "完了" }) })
+    /* @__PURE__ */ jsxs6(View5, { style: styles5.labelRow, children: [
+      /* @__PURE__ */ jsx6(Text5, { style: styles5.label, children: "日記" }),
+      focused && /* @__PURE__ */ jsx6(Pressable4, { onPress: () => Keyboard2.dismiss(), hitSlop: 8, children: /* @__PURE__ */ jsx6(Text5, { style: styles5.done, children: "完了" }) })
     ] }),
-    /* @__PURE__ */ jsx5(
+    /* @__PURE__ */ jsx6(
       TextInput2,
       {
         value: text,
@@ -745,30 +782,30 @@ function DiaryView({ diary, selectedKey, onChange, onSelect }) {
         textAlignVertical: "top"
       }
     ),
-    /* @__PURE__ */ jsx5(Text5, { style: styles5.status, children: entry ? `保存しました（${clock(entry.updatedAt)}）・${text.length}文字` : "書くと自動で保存されます" }),
-    /* @__PURE__ */ jsx5(Text5, { style: [styles5.label, { marginTop: 22 }], children: "写真" }),
-    /* @__PURE__ */ jsxs5(View5, { style: styles5.grid, children: [
-      photos.map((p) => /* @__PURE__ */ jsxs5(Pressable4, { onPress: () => setViewing(p), style: { width: tile, height: tile }, children: [
-        /* @__PURE__ */ jsx5(Image, { source: { uri: p.uri }, style: styles5.thumb }),
-        /* @__PURE__ */ jsx5(
+    /* @__PURE__ */ jsx6(Text5, { style: styles5.status, children: entry ? `保存しました（${clock(entry.updatedAt)}）・${text.length}文字` : "書くと自動で保存されます" }),
+    /* @__PURE__ */ jsx6(Text5, { style: [styles5.label, { marginTop: 22 }], children: "写真" }),
+    /* @__PURE__ */ jsxs6(View5, { style: styles5.grid, children: [
+      photos.map((p) => /* @__PURE__ */ jsxs6(Pressable4, { onPress: () => setViewing(p), style: { width: tile, height: tile }, children: [
+        /* @__PURE__ */ jsx6(Image, { source: { uri: p.uri }, style: styles5.thumb }),
+        /* @__PURE__ */ jsx6(
           Pressable4,
           {
             onPress: () => setDayPhotos(photos.filter((x) => x.id !== p.id)),
             hitSlop: 8,
             style: styles5.remove,
             accessibilityLabel: "写真を外す",
-            children: /* @__PURE__ */ jsx5(Text5, { style: styles5.removeText, children: "×" })
+            children: /* @__PURE__ */ jsx6(Text5, { style: styles5.removeText, children: "×" })
           }
         )
       ] }, p.id)),
-      photos.length < MAX_PHOTOS && /* @__PURE__ */ jsxs5(Pressable4, { onPress: addPhotos, style: [styles5.add, { width: tile, height: tile }], children: [
-        /* @__PURE__ */ jsx5(Text5, { style: styles5.addPlus, children: "＋" }),
-        /* @__PURE__ */ jsx5(Text5, { style: styles5.addText, children: "写真を追加" })
+      photos.length < MAX_PHOTOS && /* @__PURE__ */ jsxs6(Pressable4, { onPress: addPhotos, style: [styles5.add, { width: tile, height: tile }], children: [
+        /* @__PURE__ */ jsx6(Text5, { style: styles5.addPlus, children: "＋" }),
+        /* @__PURE__ */ jsx6(Text5, { style: styles5.addText, children: "写真を追加" })
       ] })
     ] }),
-    photoError ? /* @__PURE__ */ jsx5(Text5, { style: [styles5.status, { color: colors.danger }], children: photoError }) : null,
-    /* @__PURE__ */ jsx5(Modal2, { visible: viewing !== null, transparent: true, animationType: "fade", onRequestClose: () => setViewing(null), children: /* @__PURE__ */ jsxs5(Pressable4, { style: styles5.viewer, onPress: () => setViewing(null), children: [
-      viewing && /* @__PURE__ */ jsx5(
+    photoError ? /* @__PURE__ */ jsx6(Text5, { style: [styles5.status, { color: colors.danger }], children: photoError }) : null,
+    /* @__PURE__ */ jsx6(Modal2, { visible: viewing !== null, transparent: true, animationType: "fade", onRequestClose: () => setViewing(null), children: /* @__PURE__ */ jsxs6(Pressable4, { style: styles5.viewer, onPress: () => setViewing(null), children: [
+      viewing && /* @__PURE__ */ jsx6(
         Image,
         {
           source: { uri: viewing.uri },
@@ -776,21 +813,21 @@ function DiaryView({ diary, selectedKey, onChange, onSelect }) {
           resizeMode: "contain"
         }
       ),
-      /* @__PURE__ */ jsx5(Text5, { style: styles5.viewerHint, children: "タップで閉じる" })
+      /* @__PURE__ */ jsx6(Text5, { style: styles5.viewerHint, children: "タップで閉じる" })
     ] }) }),
-    recent.length > 0 && /* @__PURE__ */ jsxs5(Fragment, { children: [
-      /* @__PURE__ */ jsx5(Text5, { style: [styles5.label, { marginTop: 26 }], children: "これまでの日記" }),
+    recent.length > 0 && /* @__PURE__ */ jsxs6(Fragment2, { children: [
+      /* @__PURE__ */ jsx6(Text5, { style: [styles5.label, { marginTop: 26 }], children: "これまでの日記" }),
       recent.map((k) => {
         const e = diary[k];
         const first = e.text.trim().split("\n")[0];
-        return /* @__PURE__ */ jsxs5(Pressable4, { onPress: () => onSelect(k), style: styles5.item, children: [
-          /* @__PURE__ */ jsx5(Text5, { style: styles5.itemMood, children: e.mood !== void 0 ? MOODS[e.mood].emoji : "📝" }),
-          /* @__PURE__ */ jsxs5(View5, { style: { flex: 1 }, children: [
-            /* @__PURE__ */ jsxs5(Text5, { style: styles5.itemDate, children: [
+        return /* @__PURE__ */ jsxs6(Pressable4, { onPress: () => onSelect(k), style: styles5.item, children: [
+          e.mood !== void 0 ? /* @__PURE__ */ jsx6(MoodFace, { level: e.mood, color: colors.textSub, size: 26 }) : /* @__PURE__ */ jsx6(View5, { style: styles5.itemDot }),
+          /* @__PURE__ */ jsxs6(View5, { style: { flex: 1 }, children: [
+            /* @__PURE__ */ jsxs6(Text5, { style: styles5.itemDate, children: [
               shortDate(k),
-              e.photos ? `　📷 ${e.photos}枚` : ""
+              e.photos ? `　写真 ${e.photos}枚` : ""
             ] }),
-            /* @__PURE__ */ jsx5(Text5, { style: styles5.itemText, numberOfLines: 1, children: first || (e.photos ? "（写真だけ）" : "（気分だけ記録）") })
+            /* @__PURE__ */ jsx6(Text5, { style: styles5.itemText, numberOfLines: 1, children: first || (e.photos ? "（写真だけ）" : "（気分だけ記録）") })
           ] })
         ] }, k);
       })
@@ -815,7 +852,6 @@ var styles5 = StyleSheet5.create({
     borderColor: colors.border
   },
   moodActive: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
-  moodEmoji: { fontSize: 24 },
   moodLabel: { color: colors.textMuted, fontSize: 11, marginTop: 4, fontWeight: "600" },
   input: {
     minHeight: 220,
@@ -868,41 +904,41 @@ var styles5 = StyleSheet5.create({
     borderWidth: 1,
     borderColor: colors.border
   },
-  itemMood: { fontSize: 22 },
+  itemDot: { width: 26, alignItems: "center", height: 26, borderRadius: 13, borderWidth: 1.9, borderColor: colors.border },
   itemDate: { color: colors.textSub, fontSize: 12, fontWeight: "700" },
   itemText: { color: colors.text, fontSize: 15, marginTop: 2 }
 });
 
 // ../../../../../../home/claude/schedule-app/src/components/TabIcons.tsx
-import Svg2, { Circle as Circle2, Line as Line2, Path as Path2, Rect } from "react-native-svg";
-import { jsx as jsx6, jsxs as jsxs6 } from "react/jsx-runtime";
+import Svg3, { Circle as Circle3, Line as Line2, Path as Path3, Rect } from "react-native-svg";
+import { jsx as jsx7, jsxs as jsxs7 } from "react/jsx-runtime";
 function CircleTabIcon({ color }) {
-  return /* @__PURE__ */ jsxs6(Svg2, { width: 24, height: 24, viewBox: "0 0 24 24", children: [
-    /* @__PURE__ */ jsx6(Circle2, { cx: 12, cy: 12, r: 8.5, stroke: color, strokeWidth: 2, fill: "none", opacity: 0.45 }),
-    /* @__PURE__ */ jsx6(Path2, { d: "M12 3.5 A8.5 8.5 0 0 1 20.5 12", stroke: color, strokeWidth: 2.4, fill: "none", strokeLinecap: "round" }),
-    /* @__PURE__ */ jsx6(Line2, { x1: 12, y1: 12, x2: 12, y2: 7, stroke: color, strokeWidth: 2, strokeLinecap: "round" }),
-    /* @__PURE__ */ jsx6(Line2, { x1: 12, y1: 12, x2: 15, y2: 14, stroke: color, strokeWidth: 2, strokeLinecap: "round" })
+  return /* @__PURE__ */ jsxs7(Svg3, { width: 24, height: 24, viewBox: "0 0 24 24", children: [
+    /* @__PURE__ */ jsx7(Circle3, { cx: 12, cy: 12, r: 8.5, stroke: color, strokeWidth: 2, fill: "none", opacity: 0.45 }),
+    /* @__PURE__ */ jsx7(Path3, { d: "M12 3.5 A8.5 8.5 0 0 1 20.5 12", stroke: color, strokeWidth: 2.4, fill: "none", strokeLinecap: "round" }),
+    /* @__PURE__ */ jsx7(Line2, { x1: 12, y1: 12, x2: 12, y2: 7, stroke: color, strokeWidth: 2, strokeLinecap: "round" }),
+    /* @__PURE__ */ jsx7(Line2, { x1: 12, y1: 12, x2: 15, y2: 14, stroke: color, strokeWidth: 2, strokeLinecap: "round" })
   ] });
 }
 function CalendarTabIcon({ color }) {
-  return /* @__PURE__ */ jsxs6(Svg2, { width: 24, height: 24, viewBox: "0 0 24 24", children: [
-    /* @__PURE__ */ jsx6(Rect, { x: 3.5, y: 5, width: 17, height: 15, rx: 3, stroke: color, strokeWidth: 2, fill: "none" }),
-    /* @__PURE__ */ jsx6(Line2, { x1: 3.5, y1: 10, x2: 20.5, y2: 10, stroke: color, strokeWidth: 2 }),
-    /* @__PURE__ */ jsx6(Line2, { x1: 8, y1: 3, x2: 8, y2: 7, stroke: color, strokeWidth: 2, strokeLinecap: "round" }),
-    /* @__PURE__ */ jsx6(Line2, { x1: 16, y1: 3, x2: 16, y2: 7, stroke: color, strokeWidth: 2, strokeLinecap: "round" })
+  return /* @__PURE__ */ jsxs7(Svg3, { width: 24, height: 24, viewBox: "0 0 24 24", children: [
+    /* @__PURE__ */ jsx7(Rect, { x: 3.5, y: 5, width: 17, height: 15, rx: 3, stroke: color, strokeWidth: 2, fill: "none" }),
+    /* @__PURE__ */ jsx7(Line2, { x1: 3.5, y1: 10, x2: 20.5, y2: 10, stroke: color, strokeWidth: 2 }),
+    /* @__PURE__ */ jsx7(Line2, { x1: 8, y1: 3, x2: 8, y2: 7, stroke: color, strokeWidth: 2, strokeLinecap: "round" }),
+    /* @__PURE__ */ jsx7(Line2, { x1: 16, y1: 3, x2: 16, y2: 7, stroke: color, strokeWidth: 2, strokeLinecap: "round" })
   ] });
 }
 function DiaryTabIcon({ color }) {
-  return /* @__PURE__ */ jsxs6(Svg2, { width: 24, height: 24, viewBox: "0 0 24 24", children: [
-    /* @__PURE__ */ jsx6(Rect, { x: 5, y: 3.5, width: 14, height: 17, rx: 2.5, stroke: color, strokeWidth: 2, fill: "none" }),
-    /* @__PURE__ */ jsx6(Line2, { x1: 8.5, y1: 8.5, x2: 15.5, y2: 8.5, stroke: color, strokeWidth: 2, strokeLinecap: "round" }),
-    /* @__PURE__ */ jsx6(Line2, { x1: 8.5, y1: 12, x2: 15.5, y2: 12, stroke: color, strokeWidth: 2, strokeLinecap: "round" }),
-    /* @__PURE__ */ jsx6(Line2, { x1: 8.5, y1: 15.5, x2: 12.5, y2: 15.5, stroke: color, strokeWidth: 2, strokeLinecap: "round" })
+  return /* @__PURE__ */ jsxs7(Svg3, { width: 24, height: 24, viewBox: "0 0 24 24", children: [
+    /* @__PURE__ */ jsx7(Rect, { x: 5, y: 3.5, width: 14, height: 17, rx: 2.5, stroke: color, strokeWidth: 2, fill: "none" }),
+    /* @__PURE__ */ jsx7(Line2, { x1: 8.5, y1: 8.5, x2: 15.5, y2: 8.5, stroke: color, strokeWidth: 2, strokeLinecap: "round" }),
+    /* @__PURE__ */ jsx7(Line2, { x1: 8.5, y1: 12, x2: 15.5, y2: 12, stroke: color, strokeWidth: 2, strokeLinecap: "round" }),
+    /* @__PURE__ */ jsx7(Line2, { x1: 8.5, y1: 15.5, x2: 12.5, y2: 15.5, stroke: color, strokeWidth: 2, strokeLinecap: "round" })
   ] });
 }
 
 // ../../../../../../home/claude/schedule-app/App.tsx
-import { Fragment as Fragment2, jsx as jsx7, jsxs as jsxs7 } from "react/jsx-runtime";
+import { Fragment as Fragment3, jsx as jsx8, jsxs as jsxs8 } from "react/jsx-runtime";
 function useNow() {
   const [now, setNow] = useState4(() => /* @__PURE__ */ new Date());
   useEffect3(() => {
@@ -1014,9 +1050,9 @@ function Main() {
     if (last) return Math.min(last.end, 23 * 60);
     return isToday ? Math.min(Math.ceil(nowMinutes(now) / 60) * 60, 23 * 60) : 9 * 60;
   }, [events, isToday, now]);
-  return /* @__PURE__ */ jsxs7(SafeAreaView, { style: styles6.root, edges: ["top", "left", "right"], children: [
-    /* @__PURE__ */ jsx7(StatusBar, { style: "light" }),
-    /* @__PURE__ */ jsx7(KeyboardAvoidingView2, { style: { flex: 1 }, behavior: Platform2.OS === "ios" ? "padding" : void 0, children: /* @__PURE__ */ jsxs7(
+  return /* @__PURE__ */ jsxs8(SafeAreaView, { style: styles6.root, edges: ["top", "left", "right"], children: [
+    /* @__PURE__ */ jsx8(StatusBar, { style: "light" }),
+    /* @__PURE__ */ jsx8(KeyboardAvoidingView2, { style: { flex: 1 }, behavior: Platform2.OS === "ios" ? "padding" : void 0, children: /* @__PURE__ */ jsxs8(
       ScrollView2,
       {
         contentContainerStyle: styles6.scroll,
@@ -1024,27 +1060,27 @@ function Main() {
         keyboardShouldPersistTaps: "handled",
         keyboardDismissMode: "interactive",
         children: [
-          /* @__PURE__ */ jsx7(View6, { style: styles6.headerRow, children: /* @__PURE__ */ jsxs7(View6, { style: { flex: 1 }, children: [
-            /* @__PURE__ */ jsx7(Text6, { style: styles6.kicker, children: dayLabel ? dayLabel === "今日" ? "TODAY" : "TOMORROW" : "SCHEDULE" }),
-            /* @__PURE__ */ jsx7(Text6, { style: styles6.date, children: dateTitle })
+          /* @__PURE__ */ jsx8(View6, { style: styles6.headerRow, children: /* @__PURE__ */ jsxs8(View6, { style: { flex: 1 }, children: [
+            /* @__PURE__ */ jsx8(Text6, { style: styles6.kicker, children: dayLabel ? dayLabel === "今日" ? "TODAY" : "TOMORROW" : "SCHEDULE" }),
+            /* @__PURE__ */ jsx8(Text6, { style: styles6.date, children: dateTitle })
           ] }) }),
-          /* @__PURE__ */ jsxs7(View6, { style: styles6.segment, children: [
+          /* @__PURE__ */ jsxs8(View6, { style: styles6.segment, children: [
             [
               { key: todayKey, label: "今日" },
               { key: tomorrowKey, label: "明日" }
-            ].map((s) => /* @__PURE__ */ jsx7(
+            ].map((s) => /* @__PURE__ */ jsx8(
               Pressable5,
               {
                 onPress: () => setSelectedKey(s.key),
                 style: [styles6.segItem, selectedKey === s.key && styles6.segActive],
-                children: /* @__PURE__ */ jsx7(Text6, { style: [styles6.segText, selectedKey === s.key && styles6.segTextActive], children: s.label })
+                children: /* @__PURE__ */ jsx8(Text6, { style: [styles6.segText, selectedKey === s.key && styles6.segTextActive], children: s.label })
               },
               s.key
             )),
-            !dayLabel && /* @__PURE__ */ jsx7(View6, { style: [styles6.segItem, styles6.segActive], children: /* @__PURE__ */ jsx7(Text6, { style: [styles6.segText, styles6.segTextActive], children: `${sel.getMonth() + 1}/${sel.getDate()}` }) })
+            !dayLabel && /* @__PURE__ */ jsx8(View6, { style: [styles6.segItem, styles6.segActive], children: /* @__PURE__ */ jsx8(Text6, { style: [styles6.segText, styles6.segTextActive], children: `${sel.getMonth() + 1}/${sel.getDate()}` }) })
           ] }),
-          tab === "diary" ? /* @__PURE__ */ jsx7(DiaryView, { diary, selectedKey, onChange: changeDiary, onSelect: setSelectedKey }) : tab === "circle" ? /* @__PURE__ */ jsxs7(View6, { style: styles6.circleWrap, children: [
-            /* @__PURE__ */ jsx7(
+          tab === "diary" ? /* @__PURE__ */ jsx8(DiaryView, { diary, selectedKey, onChange: changeDiary, onSelect: setSelectedKey }) : tab === "circle" ? /* @__PURE__ */ jsxs8(View6, { style: styles6.circleWrap, children: [
+            /* @__PURE__ */ jsx8(
               CircleSchedule,
               {
                 events,
@@ -1056,19 +1092,19 @@ function Main() {
                 half
               }
             ),
-            /* @__PURE__ */ jsx7(View6, { style: styles6.halfSwitch, children: ["午前", "午後"].map((label, h) => /* @__PURE__ */ jsx7(
+            /* @__PURE__ */ jsx8(View6, { style: styles6.halfSwitch, children: ["午前", "午後"].map((label, h) => /* @__PURE__ */ jsx8(
               Pressable5,
               {
                 onPress: () => setHalf(h),
                 style: [styles6.halfItem, half === h && styles6.halfActive],
-                children: /* @__PURE__ */ jsxs7(Text6, { style: [styles6.halfText, half === h && styles6.halfTextActive], children: [
+                children: /* @__PURE__ */ jsxs8(Text6, { style: [styles6.halfText, half === h && styles6.halfTextActive], children: [
                   label,
                   halfCounts[h] ? `  ${halfCounts[h]}件` : ""
                 ] })
               },
               label
             )) })
-          ] }) : /* @__PURE__ */ jsx7(View6, { style: { marginTop: 18 }, children: /* @__PURE__ */ jsx7(
+          ] }) : /* @__PURE__ */ jsx8(View6, { style: { marginTop: 18 }, children: /* @__PURE__ */ jsx8(
             CalendarView,
             {
               schedules,
@@ -1077,31 +1113,31 @@ function Main() {
               onSelect: setSelectedKey
             }
           ) }),
-          tab !== "diary" && /* @__PURE__ */ jsxs7(Fragment2, { children: [
-            /* @__PURE__ */ jsxs7(View6, { style: styles6.sectionRow, children: [
-              /* @__PURE__ */ jsx7(Text6, { style: styles6.section, children: "タイムライン" }),
-              events.length > 1 && /* @__PURE__ */ jsx7(Pressable5, { onPress: () => deleteEvents(), hitSlop: 8, children: /* @__PURE__ */ jsx7(Text6, { style: styles6.clearAll, children: "すべて消す" }) })
+          tab !== "diary" && /* @__PURE__ */ jsxs8(Fragment3, { children: [
+            /* @__PURE__ */ jsxs8(View6, { style: styles6.sectionRow, children: [
+              /* @__PURE__ */ jsx8(Text6, { style: styles6.section, children: "タイムライン" }),
+              events.length > 1 && /* @__PURE__ */ jsx8(Pressable5, { onPress: () => deleteEvents(), hitSlop: 8, children: /* @__PURE__ */ jsx8(Text6, { style: styles6.clearAll, children: "すべて消す" }) })
             ] }),
-            /* @__PURE__ */ jsx7(EventList, { events, nowMin, onPress: openEdit, onDelete: handleDelete })
+            /* @__PURE__ */ jsx8(EventList, { events, nowMin, onPress: openEdit, onDelete: handleDelete })
           ] })
         ]
       }
     ) }),
-    toast === "saved" && /* @__PURE__ */ jsx7(View6, { style: styles6.toast, children: /* @__PURE__ */ jsx7(Text6, { style: styles6.toastText, children: "スケジュールを更新しました" }) }),
-    toast === "deleted" && undo && /* @__PURE__ */ jsxs7(View6, { style: styles6.toast, children: [
-      /* @__PURE__ */ jsx7(Text6, { style: [styles6.toastText, { flex: 1 }], numberOfLines: 1, children: undo.label }),
-      /* @__PURE__ */ jsx7(Pressable5, { onPress: undoDelete, hitSlop: 8, children: /* @__PURE__ */ jsx7(Text6, { style: styles6.toastAction, children: "元に戻す" }) })
+    toast === "saved" && /* @__PURE__ */ jsx8(View6, { style: styles6.toast, children: /* @__PURE__ */ jsx8(Text6, { style: styles6.toastText, children: "スケジュールを更新しました" }) }),
+    toast === "deleted" && undo && /* @__PURE__ */ jsxs8(View6, { style: styles6.toast, children: [
+      /* @__PURE__ */ jsx8(Text6, { style: [styles6.toastText, { flex: 1 }], numberOfLines: 1, children: undo.label }),
+      /* @__PURE__ */ jsx8(Pressable5, { onPress: undoDelete, hitSlop: 8, children: /* @__PURE__ */ jsx8(Text6, { style: styles6.toastAction, children: "元に戻す" }) })
     ] }),
-    tab !== "diary" && /* @__PURE__ */ jsx7(Pressable5, { onPress: openNew, style: styles6.fab, children: /* @__PURE__ */ jsx7(Text6, { style: styles6.fabText, children: "＋" }) }),
-    /* @__PURE__ */ jsx7(SafeAreaView, { edges: ["bottom"], style: styles6.tabBar, children: [
+    tab !== "diary" && /* @__PURE__ */ jsx8(Pressable5, { onPress: openNew, style: styles6.fab, children: /* @__PURE__ */ jsx8(Text6, { style: styles6.fabText, children: "＋" }) }),
+    /* @__PURE__ */ jsx8(SafeAreaView, { edges: ["bottom"], style: styles6.tabBar, children: [
       { key: "circle", label: "サークル", Icon: CircleTabIcon },
       { key: "calendar", label: "カレンダー", Icon: CalendarTabIcon },
       { key: "diary", label: "日記", Icon: DiaryTabIcon }
-    ].map((t) => /* @__PURE__ */ jsxs7(Pressable5, { onPress: () => setTab(t.key), style: styles6.tabItem, children: [
-      /* @__PURE__ */ jsx7(t.Icon, { color: tab === t.key ? colors.accent : colors.textMuted }),
-      /* @__PURE__ */ jsx7(Text6, { style: [styles6.tabLabel, tab === t.key && { color: colors.text }], children: t.label })
+    ].map((t) => /* @__PURE__ */ jsxs8(Pressable5, { onPress: () => setTab(t.key), style: styles6.tabItem, children: [
+      /* @__PURE__ */ jsx8(t.Icon, { color: tab === t.key ? colors.accent : colors.textMuted }),
+      /* @__PURE__ */ jsx8(Text6, { style: [styles6.tabLabel, tab === t.key && { color: colors.text }], children: t.label })
     ] }, t.key)) }),
-    /* @__PURE__ */ jsx7(
+    /* @__PURE__ */ jsx8(
       EventEditor,
       {
         visible: editorOpen,
@@ -1116,7 +1152,7 @@ function Main() {
   ] });
 }
 function App() {
-  return /* @__PURE__ */ jsx7(SafeAreaProvider, { children: /* @__PURE__ */ jsx7(Main, {}) });
+  return /* @__PURE__ */ jsx8(SafeAreaProvider, { children: /* @__PURE__ */ jsx8(Main, {}) });
 }
 var styles6 = StyleSheet6.create({
   root: { flex: 1, backgroundColor: colors.bg },
