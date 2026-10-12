@@ -10,7 +10,7 @@ export type BriefingSegment = {
   eventId?: string;
   /** サーバーで作った高品質音声。無ければ端末の音声合成で読む */
   audioUrl?: string;
-  /** 作成中の音声（ElevenLabs）。できたら再生用URI、失敗なら undefined */
+  /** 作成中の音声。できたら再生用URI、失敗なら undefined */
   audio?: Promise<string | undefined>;
 };
 
@@ -254,16 +254,13 @@ export async function listJapaneseVoices(): Promise<VoiceOption[]> {
   }
 }
 
-let autoVoice: string | undefined;
-let autoVoiceLooked = false;
+let autoVoice: VoiceOption | undefined;
 
 async function resolveVoice(voiceId?: string): Promise<string | undefined> {
   if (voiceId) return voiceId;
-  if (!autoVoiceLooked) {
-    autoVoiceLooked = true;
-    autoVoice = (await listJapaneseVoices())[0]?.id;
-  }
-  return autoVoice;
+  // 高品質な声が見つかるまでは毎回探し直す（iPhoneの設定で声をダウンロードした直後でも、すぐ使えるように）
+  if (!autoVoice?.enhanced) autoVoice = (await listJapaneseVoices())[0] ?? autoVoice;
+  return autoVoice?.id;
 }
 
 export type VoiceSettings = { voiceId?: string; rate: number; pitch: number; sound: boolean; bgm?: boolean };

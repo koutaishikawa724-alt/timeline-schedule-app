@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { colors } from '../theme';
 import { NarrationStyle, PITCH_OPTIONS, RATE_OPTIONS, Settings, STYLE_LABELS } from '../settings';
 import { listJapaneseVoices, previewVoice, VoiceOption } from '../briefing';
-import { ELEVEN_VOICES, ElevenError, getElevenQuota, previewEleven } from '../eleven';
 
 type Props = {
   visible: boolean;
@@ -33,47 +32,14 @@ function Chip({ label, sub, active, onPress }: { label: string; sub?: string; ac
 export default function SettingsSheet({ visible, settings, onChange, onClose }: Props) {
   const [voices, setVoices] = useState<VoiceOption[] | null>(null);
 
+  // 開くたびに読み直す（iPhoneの設定で声をダウンロードして戻ってきたとき、すぐ一覧に出るように）
   useEffect(() => {
-    if (visible && voices === null) listJapaneseVoices().then(setVoices);
-  }, [visible, voices]);
-
-  const [elevenStatus, setElevenStatus] = useState<string>('');
+    if (visible) listJapaneseVoices().then(setVoices);
+  }, [visible]);
 
   const set = (patch: Partial<Settings>) => onChange({ ...settings, ...patch });
   const sampleText = (s: Settings) => `${s.name ? `${s.name}さん、` : ''}${STYLE_SAMPLE[s.style]}`;
-  const sample = (s: Settings) => {
-    if (s.elevenKey.trim()) {
-      setElevenStatus('AIボイスを準備中…');
-      previewEleven(sampleText(s), s.elevenKey.trim(), s.elevenVoice)
-        .then(() => setElevenStatus(''))
-        .catch((e) => setElevenStatus(describeElevenError(e)));
-    } else {
-      previewVoice(sampleText(s), s);
-    }
-  };
-
-  const checkEleven = async () => {
-    const key = settings.elevenKey.trim();
-    if (!key) return setElevenStatus('APIキーを入力してください');
-    Keyboard.dismiss();
-    setElevenStatus('確認中…');
-    try {
-      const q = await getElevenQuota(key);
-      setElevenStatus(`接続OK。今月の残り：${Math.max(0, q.limit - q.used).toLocaleString()}文字（1回の読み上げで約300文字）`);
-    } catch (e) {
-      // 残り文字数を見る権限がないキーでも、声が作れれば使える。実際に短い声を作って確かめる
-      if (e instanceof ElevenError && e.code === 'missing_permissions') {
-        try {
-          await previewEleven('接続できました。', key, settings.elevenVoice);
-          setElevenStatus('接続OK。下から好きな声を選んでください。');
-        } catch (e2) {
-          setElevenStatus(describeElevenError(e2));
-        }
-      } else {
-        setElevenStatus(describeElevenError(e));
-      }
-    }
-  };
+  const sample = (s: Settings) => previewVoice(sampleText(s), s);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -120,45 +86,17 @@ export default function SettingsSheet({ visible, settings, onChange, onClose }: 
               ))}
             </View>
 
-            <Text style={styles.label}>AIボイス（ElevenLabs）</Text>
-            <TextInput
-              value={settings.elevenKey}
-              onChangeText={(elevenKey) => set({ elevenKey })}
-              placeholder="APIキーを貼り付け（空なら端末の声）"
-              placeholderTextColor={colors.textMuted}
-              style={styles.input}
-              autoCapitalize="none"
-              autoCorrect={false}
-              secureTextEntry
-            />
-            <View style={[styles.row, { marginTop: 8 }]}>
-              <Pressable onPress={checkEleven} style={[styles.chip, { flexGrow: 0, flexBasis: 'auto', paddingHorizontal: 16 }]}>
-                <Text style={styles.chipText}>接続を確認</Text>
-              </Pressable>
-            </View>
-            {elevenStatus ? <Text style={[styles.note, { color: colors.text }]}>{elevenStatus}</Text> : null}
-            {settings.elevenKey.trim() ? (
-              <View style={[styles.voiceList, { marginTop: 10 }]}>
-                {ELEVEN_VOICES.map((v) => (
-                  <VoiceRow
-                    key={v.id}
-                    name={v.name}
-                    sub={v.desc}
-                    active={settings.elevenVoice === v.id}
-                    onPress={() => {
-                      const next = { ...settings, elevenVoice: v.id };
-                      onChange(next);
-                      sample(next);
-                    }}
-                  />
-                ))}
+            <Text style={styles.label}>声</Text>
+            {voices !== null && !voices.some((v) => v.enhanced) && Platform.OS !== 'web' && (
+              <View style={styles.guide}>
+                <Text style={styles.guideTitle}>もっと自然な声にする（無料）</Text>
+                <Text style={styles.guideText}>
+                  {Platform.OS === 'android'
+                    ? '設定 → システム → 言語と入力 → テキスト読み上げ で、Google の日本語音声データをダウンロードしてください。'
+                    : '設定 → アクセシビリティ → 読み上げコンテンツ → 声 → 日本語 で「Otoya（プレミアム）」か「Kyoko（拡張）」をダウンロードしてください。戻ってくると自動でその声に切り替わります。'}
+                </Text>
               </View>
-            ) : null}
-            <Text style={styles.note}>
-              elevenlabs.io で無料登録 → 左下のメニュー →「Developers」→「API Keys」でキーを作成して貼り付けます。キーはこのスマホの中だけに保存されます。
-            </Text>
-
-            <Text style={styles.label}>端末の声（AIボイス未設定のとき）</Text>
+            )}
             <View style={styles.voiceList}>
               <VoiceRow
                 name="おまかせ"
@@ -243,23 +181,6 @@ export default function SettingsSheet({ visible, settings, onChange, onClose }: 
   );
 }
 
-function describeElevenError(e: unknown): string {
-  if (e instanceof ElevenError) {
-    if (e.status === 0) return 'ElevenLabs から返事がありません。電波の良い所でもう一度押してください。';
-    if (e.code === 'missing_permissions')
-      return 'このキーには声を作る権限がありません。ElevenLabs でキーを作り直し、「Text to Speech」をオンにしてください。';
-    if (e.code === 'detected_unusual_activity')
-      return 'ElevenLabs が無料プランの利用を止めています（VPNや複数アカウントが原因のことがあります）。';
-    if (e.status === 402 || e.code === 'quota_exceeded' || /quota/i.test(e.message))
-      return '今月の無料枠を使い切りました。端末の声で読み上げます。';
-    if (e.status === 401) return 'APIキーが正しくないようです。コピーし直して、前後に空白が入っていないか確かめてください。';
-    return `ElevenLabs でエラーが起きました（${e.status}${e.code ? `：${e.code}` : ''}）。`;
-  }
-  // 原因を突き止められるよう、端末が返した中身も出す
-  const detail = e instanceof Error ? e.message : String(e);
-  return `ElevenLabs に接続できませんでした（${detail.slice(0, 80)}）。`;
-}
-
 function VoiceRow({ name, sub, active, onPress }: { name: string; sub?: string; active: boolean; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} style={[styles.voiceRow, active && styles.voiceRowActive]}>
@@ -314,6 +235,16 @@ const styles = StyleSheet.create({
   voiceName: { flex: 1, color: colors.text, fontSize: 15 },
   voiceSub: { color: colors.accent, fontSize: 11, fontWeight: '700' },
   note: { color: colors.textMuted, fontSize: 12, lineHeight: 18, marginTop: 6 },
+  guide: {
+    backgroundColor: 'rgba(108,140,255,0.12)',
+    borderColor: 'rgba(108,140,255,0.35)',
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 10,
+  },
+  guideTitle: { color: colors.text, fontSize: 14, fontWeight: '700', marginBottom: 4 },
+  guideText: { color: colors.textSub, fontSize: 13, lineHeight: 19 },
   switchRow: { flexDirection: 'row', alignItems: 'center', marginTop: 18, gap: 12 },
   switchLabel: { color: colors.text, fontSize: 15 },
   testButton: {

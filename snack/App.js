@@ -1,13 +1,10 @@
 // Timeline（スケジュールアプリ）Expo Snack 用 1ファイル版
 // snack.expo.dev の App.js をすべて消して、これを貼り付けてください。
 
-var __defProp = Object.defineProperty;
 var __getOwnPropNames = Object.getOwnPropertyNames;
-var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __commonJS = (cb, mod) => function __require() {
   return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
-var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 
 // wav:../assets/sounds/intro.wav
 var require_intro = __commonJS({
@@ -705,124 +702,10 @@ function VoiceIcon({ color }) {
 
 // ../../../../../../home/claude/schedule-app/src/components/SettingsSheet.tsx
 import { useEffect as useEffect3, useState as useState3 } from "react";
-import { Keyboard as Keyboard2, KeyboardAvoidingView as KeyboardAvoidingView2, Modal as Modal3, Platform as Platform3, Pressable as Pressable5, ScrollView as ScrollView2, StyleSheet as StyleSheet6, Switch, Text as Text6, TextInput as TextInput2, View as View6 } from "react-native";
+import { KeyboardAvoidingView as KeyboardAvoidingView2, Modal as Modal3, Platform as Platform2, Pressable as Pressable5, ScrollView as ScrollView2, StyleSheet as StyleSheet6, Switch, Text as Text6, TextInput as TextInput2, View as View6 } from "react-native";
 
 // ../../../../../../home/claude/schedule-app/src/settings.ts
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-// ../../../../../../home/claude/schedule-app/src/eleven.ts
-import { Platform as Platform2 } from "react-native";
-import { createAudioPlayer } from "expo-audio";
-var API = "https://api.elevenlabs.io/v1";
-var MODEL = "eleven_multilingual_v2";
-var ELEVEN_VOICES = [
-  { id: "pNInz6obpgDQGcFmaJgB", name: "Adam", desc: "深く力強い男性" },
-  { id: "nPczCjzI2devNBz1zQrb", name: "Brian", desc: "低く落ち着いたナレーター" },
-  { id: "onwK4e9ZLuTAKqWW03F9", name: "Daniel", desc: "ニュースキャスター風" },
-  { id: "JBFqnCBsd6RMkjVDRZzb", name: "George", desc: "渋く温かい語り" },
-  { id: "21m00Tcm4TlvDq8ikWAM", name: "Rachel", desc: "落ち着いた女性" },
-  { id: "EXAVITQu4vr4xnoxsVTL", name: "Sarah", desc: "やわらかい女性" }
-];
-var DEFAULT_ELEVEN_VOICE = ELEVEN_VOICES[1].id;
-var ElevenError = class extends Error {
-  constructor(message, status) {
-    super(message);
-    this.status = status;
-    /** ElevenLabs が返す理由（invalid_api_key, missing_permissions, quota_exceeded など） */
-    __publicField(this, "code");
-    let code = "";
-    try {
-      const detail = JSON.parse(message)?.detail;
-      code = typeof detail?.status === "string" ? detail.status : "";
-    } catch {
-    }
-    this.code = code;
-  }
-};
-async function fetchWithTimeout(url, init, ms) {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), ms);
-  try {
-    return await fetch(url, { ...init, signal: ctrl.signal });
-  } catch (e) {
-    if (ctrl.signal.aborted) throw new ElevenError("timeout", 0);
-    throw e;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-async function getElevenQuota(apiKey) {
-  const res = await fetchWithTimeout(`${API}/user/subscription`, { headers: { "xi-api-key": apiKey } }, 15e3);
-  if (!res.ok) throw new ElevenError(await res.text(), res.status);
-  const data = await res.json();
-  return { used: data.character_count, limit: data.character_limit };
-}
-var memoryCache = /* @__PURE__ */ new Map();
-var B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-function toBase64(bytes) {
-  let out = "";
-  for (let i = 0; i < bytes.length; i += 3) {
-    const a = bytes[i];
-    const b = i + 1 < bytes.length ? bytes[i + 1] : 0;
-    const c = i + 2 < bytes.length ? bytes[i + 2] : 0;
-    out += B64[a >> 2] + B64[(a & 3) << 4 | b >> 4];
-    out += i + 1 < bytes.length ? B64[(b & 15) << 2 | c >> 6] : "=";
-    out += i + 2 < bytes.length ? B64[c & 63] : "=";
-  }
-  return out;
-}
-async function synthesizeEleven(text, apiKey, voiceId) {
-  const key = `${voiceId}:${text}`;
-  const cached = memoryCache.get(key);
-  if (cached) return cached;
-  const res = await fetchWithTimeout(`${API}/text-to-speech/${voiceId}?output_format=mp3_44100_128`, {
-    method: "POST",
-    headers: { "xi-api-key": apiKey, "Content-Type": "application/json", Accept: "audio/mpeg" },
-    body: JSON.stringify({
-      text,
-      model_id: MODEL,
-      language_code: "ja",
-      voice_settings: { stability: 0.45, similarity_boost: 0.8, style: 0.35, use_speaker_boost: true }
-    })
-  }, 3e4);
-  if (!res.ok) throw new ElevenError(await res.text(), res.status);
-  const uri = Platform2.OS === "web" ? URL.createObjectURL(await res.blob()) : `data:audio/mpeg;base64,${toBase64(new Uint8Array(await res.arrayBuffer()))}`;
-  memoryCache.set(key, uri);
-  return uri;
-}
-function prefetchEleven(texts, apiKey, voiceId) {
-  const resolvers = [];
-  const promises = texts.map((_, i) => new Promise((r) => resolvers[i] = r));
-  let next = 0;
-  let fatal = false;
-  const worker = async () => {
-    while (next < texts.length) {
-      const i = next++;
-      if (fatal) {
-        resolvers[i](void 0);
-        continue;
-      }
-      try {
-        resolvers[i](await synthesizeEleven(texts[i], apiKey, voiceId));
-      } catch (err) {
-        if (err instanceof ElevenError && (err.status === 401 || err.status === 402 || err.status === 403)) fatal = true;
-        resolvers[i](void 0);
-      }
-    }
-  };
-  void worker();
-  void worker();
-  return promises;
-}
-var previewPlayer = null;
-async function previewEleven(text, apiKey, voiceId) {
-  const uri = await synthesizeEleven(text, apiKey, voiceId);
-  previewPlayer?.remove();
-  previewPlayer = createAudioPlayer({ uri });
-  previewPlayer.play();
-}
-
-// ../../../../../../home/claude/schedule-app/src/settings.ts
 var RATE_OPTIONS = [
   { value: 0.85, label: "ゆっくり" },
   { value: 0.95, label: "ふつう" },
@@ -834,7 +717,7 @@ var PITCH_OPTIONS = [
   { value: 1.05, label: "高め" }
 ];
 var snap = (value, options) => options.reduce((best, o) => Math.abs(o.value - value) < Math.abs(best - value) ? o.value : best, options[0].value);
-var defaultSettings = { name: "", style: "mission", rate: 0.95, pitch: 0.9, sound: true, bgm: true, elevenKey: "", elevenVoice: DEFAULT_ELEVEN_VOICE };
+var defaultSettings = { name: "", style: "mission", rate: 0.95, pitch: 0.9, sound: true, bgm: true };
 var STYLE_LABELS = {
   mission: { label: "ミッション", desc: "作戦会議風" },
   dj: { label: "ラジオDJ", desc: "明るく軽快" },
@@ -860,7 +743,7 @@ async function saveSettings(s) {
 
 // ../../../../../../home/claude/schedule-app/src/briefing.ts
 import * as Speech from "expo-speech";
-import { createAudioPlayer as createAudioPlayer2, setAudioModeAsync } from "expo-audio";
+import { createAudioPlayer, setAudioModeAsync } from "expo-audio";
 var API_URL = void 0;
 var APP_TOKEN = void 0;
 var aiBriefingEnabled = !!API_URL;
@@ -1031,17 +914,13 @@ async function listJapaneseVoices() {
   }
 }
 var autoVoice;
-var autoVoiceLooked = false;
 async function resolveVoice(voiceId) {
   if (voiceId) return voiceId;
-  if (!autoVoiceLooked) {
-    autoVoiceLooked = true;
-    autoVoice = (await listJapaneseVoices())[0]?.id;
-  }
-  return autoVoice;
+  if (!autoVoice?.enhanced) autoVoice = (await listJapaneseVoices())[0] ?? autoVoice;
+  return autoVoice?.id;
 }
 function playSource(source, onDone) {
-  const p = createAudioPlayer2(source);
+  const p = createAudioPlayer(source);
   let done = false;
   p.addListener("playbackStatusUpdate", (status) => {
     if (status.didJustFinish && !done) {
@@ -1068,7 +947,7 @@ function playBriefing(segments, voice, onSegment, onFinish) {
   const startBgm = () => {
     if (!voice.bgm || !BGM || bgm) return;
     try {
-      bgm = createAudioPlayer2(BGM);
+      bgm = createAudioPlayer(BGM);
       bgm.loop = true;
       bgm.volume = BGM_VOLUME;
       bgm.play();
@@ -1178,41 +1057,12 @@ function Chip2({ label, sub, active, onPress }) {
 function SettingsSheet({ visible, settings, onChange, onClose }) {
   const [voices, setVoices] = useState3(null);
   useEffect3(() => {
-    if (visible && voices === null) listJapaneseVoices().then(setVoices);
-  }, [visible, voices]);
-  const [elevenStatus, setElevenStatus] = useState3("");
+    if (visible) listJapaneseVoices().then(setVoices);
+  }, [visible]);
   const set = (patch) => onChange({ ...settings, ...patch });
   const sampleText = (s) => `${s.name ? `${s.name}さん、` : ""}${STYLE_SAMPLE[s.style]}`;
-  const sample = (s) => {
-    if (s.elevenKey.trim()) {
-      setElevenStatus("AIボイスを準備中…");
-      previewEleven(sampleText(s), s.elevenKey.trim(), s.elevenVoice).then(() => setElevenStatus("")).catch((e) => setElevenStatus(describeElevenError(e)));
-    } else {
-      previewVoice(sampleText(s), s);
-    }
-  };
-  const checkEleven = async () => {
-    const key = settings.elevenKey.trim();
-    if (!key) return setElevenStatus("APIキーを入力してください");
-    Keyboard2.dismiss();
-    setElevenStatus("確認中…");
-    try {
-      const q = await getElevenQuota(key);
-      setElevenStatus(`接続OK。今月の残り：${Math.max(0, q.limit - q.used).toLocaleString()}文字（1回の読み上げで約300文字）`);
-    } catch (e) {
-      if (e instanceof ElevenError && e.code === "missing_permissions") {
-        try {
-          await previewEleven("接続できました。", key, settings.elevenVoice);
-          setElevenStatus("接続OK。下から好きな声を選んでください。");
-        } catch (e2) {
-          setElevenStatus(describeElevenError(e2));
-        }
-      } else {
-        setElevenStatus(describeElevenError(e));
-      }
-    }
-  };
-  return /* @__PURE__ */ jsx7(Modal3, { visible, transparent: true, animationType: "slide", onRequestClose: onClose, children: /* @__PURE__ */ jsxs7(KeyboardAvoidingView2, { behavior: Platform3.OS === "ios" ? "padding" : void 0, style: styles6.backdrop, children: [
+  const sample = (s) => previewVoice(sampleText(s), s);
+  return /* @__PURE__ */ jsx7(Modal3, { visible, transparent: true, animationType: "slide", onRequestClose: onClose, children: /* @__PURE__ */ jsxs7(KeyboardAvoidingView2, { behavior: Platform2.OS === "ios" ? "padding" : void 0, style: styles6.backdrop, children: [
     /* @__PURE__ */ jsx7(Pressable5, { style: StyleSheet6.absoluteFill, onPress: onClose }),
     /* @__PURE__ */ jsxs7(View6, { style: styles6.sheet, children: [
       /* @__PURE__ */ jsx7(View6, { style: styles6.grabber }),
@@ -1254,38 +1104,11 @@ function SettingsSheet({ visible, settings, onChange, onClose }) {
               },
               k
             )) }),
-            /* @__PURE__ */ jsx7(Text6, { style: styles6.label, children: "AIボイス（ElevenLabs）" }),
-            /* @__PURE__ */ jsx7(
-              TextInput2,
-              {
-                value: settings.elevenKey,
-                onChangeText: (elevenKey) => set({ elevenKey }),
-                placeholder: "APIキーを貼り付け（空なら端末の声）",
-                placeholderTextColor: colors.textMuted,
-                style: styles6.input,
-                autoCapitalize: "none",
-                autoCorrect: false,
-                secureTextEntry: true
-              }
-            ),
-            /* @__PURE__ */ jsx7(View6, { style: [styles6.row, { marginTop: 8 }], children: /* @__PURE__ */ jsx7(Pressable5, { onPress: checkEleven, style: [styles6.chip, { flexGrow: 0, flexBasis: "auto", paddingHorizontal: 16 }], children: /* @__PURE__ */ jsx7(Text6, { style: styles6.chipText, children: "接続を確認" }) }) }),
-            elevenStatus ? /* @__PURE__ */ jsx7(Text6, { style: [styles6.note, { color: colors.text }], children: elevenStatus }) : null,
-            settings.elevenKey.trim() ? /* @__PURE__ */ jsx7(View6, { style: [styles6.voiceList, { marginTop: 10 }], children: ELEVEN_VOICES.map((v) => /* @__PURE__ */ jsx7(
-              VoiceRow,
-              {
-                name: v.name,
-                sub: v.desc,
-                active: settings.elevenVoice === v.id,
-                onPress: () => {
-                  const next = { ...settings, elevenVoice: v.id };
-                  onChange(next);
-                  sample(next);
-                }
-              },
-              v.id
-            )) }) : null,
-            /* @__PURE__ */ jsx7(Text6, { style: styles6.note, children: "elevenlabs.io で無料登録 → 左下のメニュー →「Developers」→「API Keys」でキーを作成して貼り付けます。キーはこのスマホの中だけに保存されます。" }),
-            /* @__PURE__ */ jsx7(Text6, { style: styles6.label, children: "端末の声（AIボイス未設定のとき）" }),
+            /* @__PURE__ */ jsx7(Text6, { style: styles6.label, children: "声" }),
+            voices !== null && !voices.some((v) => v.enhanced) && Platform2.OS !== "web" && /* @__PURE__ */ jsxs7(View6, { style: styles6.guide, children: [
+              /* @__PURE__ */ jsx7(Text6, { style: styles6.guideTitle, children: "もっと自然な声にする（無料）" }),
+              /* @__PURE__ */ jsx7(Text6, { style: styles6.guideText, children: Platform2.OS === "android" ? "設定 → システム → 言語と入力 → テキスト読み上げ で、Google の日本語音声データをダウンロードしてください。" : "設定 → アクセシビリティ → 読み上げコンテンツ → 声 → 日本語 で「Otoya（プレミアム）」か「Kyoko（拡張）」をダウンロードしてください。戻ってくると自動でその声に切り替わります。" })
+            ] }),
             /* @__PURE__ */ jsxs7(View6, { style: styles6.voiceList, children: [
               /* @__PURE__ */ jsx7(
                 VoiceRow,
@@ -1316,7 +1139,7 @@ function SettingsSheet({ visible, settings, onChange, onClose }) {
               )),
               voices !== null && voices.length === 0 && /* @__PURE__ */ jsx7(Text6, { style: styles6.note, children: "この端末では日本語の声の一覧を取得できませんでした。" })
             ] }),
-            /* @__PURE__ */ jsx7(Text6, { style: styles6.note, children: Platform3.OS === "android" ? "ヒント：設定 → システム → 言語と入力 → テキスト読み上げ で、Google の日本語音声データを入れると声が自然になります（無料）。" : "ヒント：iPhone の 設定 → アクセシビリティ → 読み上げコンテンツ → 声 → 日本語 で「拡張」や「プレミアム」の声を無料でダウンロードすると、ぐっと自然な声になります。" }),
+            /* @__PURE__ */ jsx7(Text6, { style: styles6.note, children: Platform2.OS === "android" ? "ヒント：設定 → システム → 言語と入力 → テキスト読み上げ で、Google の日本語音声データを入れると声が自然になります（無料）。" : "ヒント：iPhone の 設定 → アクセシビリティ → 読み上げコンテンツ → 声 → 日本語 で「拡張」や「プレミアム」の声を無料でダウンロードすると、ぐっと自然な声になります。" }),
             /* @__PURE__ */ jsx7(Text6, { style: styles6.label, children: "速さ" }),
             /* @__PURE__ */ jsx7(View6, { style: styles6.row, children: RATES.map((r) => /* @__PURE__ */ jsx7(Chip2, { label: r.label, active: settings.rate === r.value, onPress: () => set({ rate: r.value }) }, r.value)) }),
             /* @__PURE__ */ jsx7(Text6, { style: styles6.label, children: "声の高さ" }),
@@ -1357,21 +1180,6 @@ function SettingsSheet({ visible, settings, onChange, onClose }) {
       )
     ] })
   ] }) });
-}
-function describeElevenError(e) {
-  if (e instanceof ElevenError) {
-    if (e.status === 0) return "ElevenLabs から返事がありません。電波の良い所でもう一度押してください。";
-    if (e.code === "missing_permissions")
-      return "このキーには声を作る権限がありません。ElevenLabs でキーを作り直し、「Text to Speech」をオンにしてください。";
-    if (e.code === "detected_unusual_activity")
-      return "ElevenLabs が無料プランの利用を止めています（VPNや複数アカウントが原因のことがあります）。";
-    if (e.status === 402 || e.code === "quota_exceeded" || /quota/i.test(e.message))
-      return "今月の無料枠を使い切りました。端末の声で読み上げます。";
-    if (e.status === 401) return "APIキーが正しくないようです。コピーし直して、前後に空白が入っていないか確かめてください。";
-    return `ElevenLabs でエラーが起きました（${e.status}${e.code ? `：${e.code}` : ""}）。`;
-  }
-  const detail = e instanceof Error ? e.message : String(e);
-  return `ElevenLabs に接続できませんでした（${detail.slice(0, 80)}）。`;
 }
 function VoiceRow({ name, sub, active, onPress }) {
   return /* @__PURE__ */ jsxs7(Pressable5, { onPress, style: [styles6.voiceRow, active && styles6.voiceRowActive], children: [
@@ -1422,6 +1230,16 @@ var styles6 = StyleSheet6.create({
   voiceName: { flex: 1, color: colors.text, fontSize: 15 },
   voiceSub: { color: colors.accent, fontSize: 11, fontWeight: "700" },
   note: { color: colors.textMuted, fontSize: 12, lineHeight: 18, marginTop: 6 },
+  guide: {
+    backgroundColor: "rgba(108,140,255,0.12)",
+    borderColor: "rgba(108,140,255,0.35)",
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 10
+  },
+  guideTitle: { color: colors.text, fontSize: 14, fontWeight: "700", marginBottom: 4 },
+  guideText: { color: colors.textSub, fontSize: 13, lineHeight: 19 },
   switchRow: { flexDirection: "row", alignItems: "center", marginTop: 18, gap: 12 },
   switchLabel: { color: colors.text, fontSize: 15 },
   testButton: {
@@ -1559,14 +1377,6 @@ function Main() {
     const ai = await fetchAiBriefing(selectedKey, events, dayLabel);
     if (run !== briefRun.current) return;
     const segs = ai ?? buildBriefing(selectedKey, events, dayLabel, { name: settings.name, style: settings.style });
-    if (settings.elevenKey.trim() && !segs.some((sg) => sg.audioUrl)) {
-      const audio = prefetchEleven(
-        segs.map((sg) => sg.text),
-        settings.elevenKey.trim(),
-        settings.elevenVoice
-      );
-      segs.forEach((sg, i) => sg.audio = audio[i]);
-    }
     setBriefing(segs);
     briefHandle.current = playBriefing(segs, settings, setBriefIndex, () => {
       briefHandle.current = null;
