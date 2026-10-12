@@ -1374,7 +1374,8 @@ function describeElevenError(e) {
     if (e.status === 401) return "APIキーが正しくないようです。コピーし直して、前後に空白が入っていないか確かめてください。";
     return `ElevenLabs でエラーが起きました（${e.status}${e.code ? `：${e.code}` : ""}）。`;
   }
-  return "ElevenLabs に接続できませんでした。通信を確認してください。";
+  const detail = e instanceof Error ? e.message : String(e);
+  return `ElevenLabs に接続できませんでした（${detail.slice(0, 80)}）。`;
 }
 function VoiceRow({ name, sub, active, onPress }) {
   return /* @__PURE__ */ jsxs7(Pressable5, { onPress, style: [styles6.voiceRow, active && styles6.voiceRowActive], children: [

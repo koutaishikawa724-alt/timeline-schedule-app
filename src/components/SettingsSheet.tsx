@@ -255,7 +255,9 @@ function describeElevenError(e: unknown): string {
     if (e.status === 401) return 'APIキーが正しくないようです。コピーし直して、前後に空白が入っていないか確かめてください。';
     return `ElevenLabs でエラーが起きました（${e.status}${e.code ? `：${e.code}` : ''}）。`;
   }
-  return 'ElevenLabs に接続できませんでした。通信を確認してください。';
+  // 原因を突き止められるよう、端末が返した中身も出す
+  const detail = e instanceof Error ? e.message : String(e);
+  return `ElevenLabs に接続できませんでした（${detail.slice(0, 80)}）。`;
 }
 
 function VoiceRow({ name, sub, active, onPress }: { name: string; sub?: string; active: boolean; onPress: () => void }) {
