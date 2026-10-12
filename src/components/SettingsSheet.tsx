@@ -117,7 +117,7 @@ export default function SettingsSheet({ visible, settings, onChange, onClose }: 
               secureTextEntry
             />
             <View style={[styles.row, { marginTop: 8 }]}>
-              <Pressable onPress={checkEleven} style={[styles.chip, { flex: 0, paddingHorizontal: 16 }]}>
+              <Pressable onPress={checkEleven} style={[styles.chip, { flexGrow: 0, flexBasis: 'auto', paddingHorizontal: 16 }]}>
                 <Text style={styles.chipText}>接続を確認</Text>
               </Pressable>
             </View>
@@ -140,7 +140,7 @@ export default function SettingsSheet({ visible, settings, onChange, onClose }: 
               </View>
             ) : null}
             <Text style={styles.note}>
-              elevenlabs.io で無料登録 → 左下のアカウント →「API Keys」でキーを作成して貼り付けます。キーはこのスマホの中だけに保存されます。
+              elevenlabs.io で無料登録 → 左下のメニュー →「Developers」→「API Keys」でキーを作成して貼り付けます。キーはこのスマホの中だけに保存されます。
             </Text>
 
             <Text style={styles.label}>端末の声（AIボイス未設定のとき）</Text>

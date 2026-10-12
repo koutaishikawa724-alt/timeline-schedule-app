@@ -1232,7 +1232,7 @@ function SettingsSheet({ visible, settings, onChange, onClose }) {
             secureTextEntry: true
           }
         ),
-        /* @__PURE__ */ jsx7(View6, { style: [styles6.row, { marginTop: 8 }], children: /* @__PURE__ */ jsx7(Pressable5, { onPress: checkEleven, style: [styles6.chip, { flex: 0, paddingHorizontal: 16 }], children: /* @__PURE__ */ jsx7(Text6, { style: styles6.chipText, children: "接続を確認" }) }) }),
+        /* @__PURE__ */ jsx7(View6, { style: [styles6.row, { marginTop: 8 }], children: /* @__PURE__ */ jsx7(Pressable5, { onPress: checkEleven, style: [styles6.chip, { flexGrow: 0, flexBasis: "auto", paddingHorizontal: 16 }], children: /* @__PURE__ */ jsx7(Text6, { style: styles6.chipText, children: "接続を確認" }) }) }),
         elevenStatus ? /* @__PURE__ */ jsx7(Text6, { style: [styles6.note, { color: colors.text }], children: elevenStatus }) : null,
         settings.elevenKey.trim() ? /* @__PURE__ */ jsx7(View6, { style: [styles6.voiceList, { marginTop: 10 }], children: ELEVEN_VOICES.map((v) => /* @__PURE__ */ jsx7(
           VoiceRow,
@@ -1248,7 +1248,7 @@ function SettingsSheet({ visible, settings, onChange, onClose }) {
           },
           v.id
         )) }) : null,
-        /* @__PURE__ */ jsx7(Text6, { style: styles6.note, children: "elevenlabs.io で無料登録 → 左下のアカウント →「API Keys」でキーを作成して貼り付けます。キーはこのスマホの中だけに保存されます。" }),
+        /* @__PURE__ */ jsx7(Text6, { style: styles6.note, children: "elevenlabs.io で無料登録 → 左下のメニュー →「Developers」→「API Keys」でキーを作成して貼り付けます。キーはこのスマホの中だけに保存されます。" }),
         /* @__PURE__ */ jsx7(Text6, { style: styles6.label, children: "端末の声（AIボイス未設定のとき）" }),
         /* @__PURE__ */ jsxs7(View6, { style: styles6.voiceList, children: [
           /* @__PURE__ */ jsx7(
