@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DiaryMap, ScheduleMap } from './types';
+import { DiaryMap, DiaryPhoto, ScheduleMap } from './types';
 
 const KEY = 'schedule.v1';
 
@@ -34,6 +34,27 @@ export async function loadDiary(): Promise<DiaryMap> {
 export async function saveDiary(map: DiaryMap): Promise<void> {
   try {
     await AsyncStorage.setItem(DIARY_KEY, JSON.stringify(map));
+  } catch {
+    // 保存できなくてもアプリは動かし続ける
+  }
+}
+
+/** 日記の写真は大きいので、日ごとに別の場所へ保存する（本文の自動保存を重くしないため） */
+const photoKey = (dayKey: string) => `diaryPhotos.v1:${dayKey}`;
+
+export async function loadDiaryPhotos(dayKey: string): Promise<DiaryPhoto[]> {
+  try {
+    const raw = await AsyncStorage.getItem(photoKey(dayKey));
+    return raw ? (JSON.parse(raw) as DiaryPhoto[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveDiaryPhotos(dayKey: string, photos: DiaryPhoto[]): Promise<void> {
+  try {
+    if (photos.length) await AsyncStorage.setItem(photoKey(dayKey), JSON.stringify(photos));
+    else await AsyncStorage.removeItem(photoKey(dayKey));
   } catch {
     // 保存できなくてもアプリは動かし続ける
   }

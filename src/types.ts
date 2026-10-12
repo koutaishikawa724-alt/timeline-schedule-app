@@ -16,6 +16,16 @@ export type DiaryEntry = {
   mood?: number;
   /** 最後に書いた時刻（ミリ秒） */
   updatedAt: number;
+  /** 貼った写真の枚数（写真そのものは別に保存） */
+  photos?: number;
+};
+
+export type DiaryPhoto = {
+  id: string;
+  /** 表示用の画像（data: URI） */
+  uri: string;
+  width: number;
+  height: number;
 };
 
 export type DiaryMap = Record<string, DiaryEntry>;

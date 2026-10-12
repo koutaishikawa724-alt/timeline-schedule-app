@@ -25,7 +25,10 @@
     },
     "backgroundColor": "#090B14",
     "plugins": [
-      "expo-audio"
+      [
+        "expo-image-picker",
+        { "photosPermission": "日記に写真を貼るために、写真ライブラリを使います。" }
+      ]
     ]
   }
 }

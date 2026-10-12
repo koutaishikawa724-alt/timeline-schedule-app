@@ -3,8 +3,8 @@
 
 
 // ../../../../../../home/claude/schedule-app/App.tsx
-import { useEffect as useEffect2, useMemo as useMemo2, useRef as useRef2, useState as useState4 } from "react";
-import { KeyboardAvoidingView as KeyboardAvoidingView2, Platform as Platform2, Pressable as Pressable5, ScrollView as ScrollView2, StyleSheet as StyleSheet6, Text as Text6, useWindowDimensions, View as View6 } from "react-native";
+import { useEffect as useEffect3, useMemo as useMemo2, useRef as useRef2, useState as useState4 } from "react";
+import { KeyboardAvoidingView as KeyboardAvoidingView2, Platform as Platform2, Pressable as Pressable5, ScrollView as ScrollView2, StyleSheet as StyleSheet6, Text as Text6, useWindowDimensions as useWindowDimensions2, View as View6 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
@@ -575,8 +575,60 @@ var styles4 = StyleSheet4.create({
 });
 
 // ../../../../../../home/claude/schedule-app/src/components/DiaryView.tsx
-import { useState as useState3 } from "react";
-import { Keyboard as Keyboard2, Pressable as Pressable4, StyleSheet as StyleSheet5, Text as Text5, TextInput as TextInput2, View as View5 } from "react-native";
+import { useEffect as useEffect2, useState as useState3 } from "react";
+import { Image, Keyboard as Keyboard2, Modal as Modal2, Pressable as Pressable4, StyleSheet as StyleSheet5, Text as Text5, TextInput as TextInput2, useWindowDimensions, View as View5 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
+
+// ../../../../../../home/claude/schedule-app/src/storage.ts
+import AsyncStorage from "@react-native-async-storage/async-storage";
+var KEY = "schedule.v1";
+async function loadSchedules() {
+  try {
+    const raw = await AsyncStorage.getItem(KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+async function saveSchedules(map) {
+  try {
+    await AsyncStorage.setItem(KEY, JSON.stringify(map));
+  } catch {
+  }
+}
+var DIARY_KEY = "diary.v1";
+async function loadDiary() {
+  try {
+    const raw = await AsyncStorage.getItem(DIARY_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+async function saveDiary(map) {
+  try {
+    await AsyncStorage.setItem(DIARY_KEY, JSON.stringify(map));
+  } catch {
+  }
+}
+var photoKey = (dayKey) => `diaryPhotos.v1:${dayKey}`;
+async function loadDiaryPhotos(dayKey) {
+  try {
+    const raw = await AsyncStorage.getItem(photoKey(dayKey));
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+async function saveDiaryPhotos(dayKey, photos) {
+  try {
+    if (photos.length) await AsyncStorage.setItem(photoKey(dayKey), JSON.stringify(photos));
+    else await AsyncStorage.removeItem(photoKey(dayKey));
+  } catch {
+  }
+}
+
+// ../../../../../../home/claude/schedule-app/src/components/DiaryView.tsx
 import { Fragment, jsx as jsx5, jsxs as jsxs5 } from "react/jsx-runtime";
 var MOODS = [
   { emoji: "😄", label: "最高" },
@@ -589,18 +641,61 @@ var shortDate = (key) => {
   const d = fromKey(key);
   return `${d.getMonth() + 1}/${d.getDate()}（${weekday(d)}）`;
 };
+var MAX_PHOTOS = 6;
 var clock = (ms) => {
   const d = new Date(ms);
   return `${d.getHours()}:${`${d.getMinutes()}`.padStart(2, "0")}`;
 };
 function DiaryView({ diary, selectedKey, onChange, onSelect }) {
+  const { width } = useWindowDimensions();
   const [focused, setFocused] = useState3(false);
+  const [photos, setPhotos] = useState3([]);
+  const [viewing, setViewing] = useState3(null);
+  const [photoError, setPhotoError] = useState3("");
   const entry = diary[selectedKey];
   const text = entry?.text ?? "";
+  useEffect2(() => {
+    let alive = true;
+    setPhotos([]);
+    setPhotoError("");
+    loadDiaryPhotos(selectedKey).then((p) => alive && setPhotos(p));
+    return () => {
+      alive = false;
+    };
+  }, [selectedKey]);
   const update = (patch) => {
-    const next = { text, mood: entry?.mood, ...patch, updatedAt: Date.now() };
-    onChange(selectedKey, next.text.trim() || next.mood !== void 0 ? next : null);
+    const next = { text, mood: entry?.mood, photos: entry?.photos, ...patch, updatedAt: Date.now() };
+    onChange(selectedKey, next.text.trim() || next.mood !== void 0 || next.photos ? next : null);
   };
+  const setDayPhotos = (next) => {
+    setPhotos(next);
+    saveDiaryPhotos(selectedKey, next);
+    update({ photos: next.length || void 0 });
+  };
+  const addPhotos = async () => {
+    setPhotoError("");
+    try {
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsMultipleSelection: true,
+        selectionLimit: MAX_PHOTOS - photos.length,
+        // 端末の中に保存するので、小さめに圧縮して文字データとして持つ
+        quality: 0.35,
+        base64: true
+      });
+      if (res.canceled) return;
+      const added = res.assets.filter((a) => a.base64 || a.uri.startsWith("data:")).map((a, i) => ({
+        id: `${Date.now()}-${i}`,
+        uri: a.base64 ? `data:${a.mimeType ?? "image/jpeg"};base64,${a.base64}` : a.uri,
+        width: a.width || 1,
+        height: a.height || 1
+      }));
+      setDayPhotos([...photos, ...added].slice(0, MAX_PHOTOS));
+    } catch {
+      setPhotoError("写真を開けませんでした。設定アプリで写真へのアクセスを許可してください。");
+    }
+  };
+  const tile = Math.floor((Math.min(width, 560) - 40 - 16) / 3);
   const sel = fromKey(selectedKey);
   const prevKey = dateKey(addDays(sel, -1));
   const nextKey = dateKey(addDays(sel, 1));
@@ -651,6 +746,38 @@ function DiaryView({ diary, selectedKey, onChange, onSelect }) {
       }
     ),
     /* @__PURE__ */ jsx5(Text5, { style: styles5.status, children: entry ? `保存しました（${clock(entry.updatedAt)}）・${text.length}文字` : "書くと自動で保存されます" }),
+    /* @__PURE__ */ jsx5(Text5, { style: [styles5.label, { marginTop: 22 }], children: "写真" }),
+    /* @__PURE__ */ jsxs5(View5, { style: styles5.grid, children: [
+      photos.map((p) => /* @__PURE__ */ jsxs5(Pressable4, { onPress: () => setViewing(p), style: { width: tile, height: tile }, children: [
+        /* @__PURE__ */ jsx5(Image, { source: { uri: p.uri }, style: styles5.thumb }),
+        /* @__PURE__ */ jsx5(
+          Pressable4,
+          {
+            onPress: () => setDayPhotos(photos.filter((x) => x.id !== p.id)),
+            hitSlop: 8,
+            style: styles5.remove,
+            accessibilityLabel: "写真を外す",
+            children: /* @__PURE__ */ jsx5(Text5, { style: styles5.removeText, children: "×" })
+          }
+        )
+      ] }, p.id)),
+      photos.length < MAX_PHOTOS && /* @__PURE__ */ jsxs5(Pressable4, { onPress: addPhotos, style: [styles5.add, { width: tile, height: tile }], children: [
+        /* @__PURE__ */ jsx5(Text5, { style: styles5.addPlus, children: "＋" }),
+        /* @__PURE__ */ jsx5(Text5, { style: styles5.addText, children: "写真を追加" })
+      ] })
+    ] }),
+    photoError ? /* @__PURE__ */ jsx5(Text5, { style: [styles5.status, { color: colors.danger }], children: photoError }) : null,
+    /* @__PURE__ */ jsx5(Modal2, { visible: viewing !== null, transparent: true, animationType: "fade", onRequestClose: () => setViewing(null), children: /* @__PURE__ */ jsxs5(Pressable4, { style: styles5.viewer, onPress: () => setViewing(null), children: [
+      viewing && /* @__PURE__ */ jsx5(
+        Image,
+        {
+          source: { uri: viewing.uri },
+          style: { width: "100%", aspectRatio: viewing.width / viewing.height, maxHeight: "85%" },
+          resizeMode: "contain"
+        }
+      ),
+      /* @__PURE__ */ jsx5(Text5, { style: styles5.viewerHint, children: "タップで閉じる" })
+    ] }) }),
     recent.length > 0 && /* @__PURE__ */ jsxs5(Fragment, { children: [
       /* @__PURE__ */ jsx5(Text5, { style: [styles5.label, { marginTop: 26 }], children: "これまでの日記" }),
       recent.map((k) => {
@@ -659,8 +786,11 @@ function DiaryView({ diary, selectedKey, onChange, onSelect }) {
         return /* @__PURE__ */ jsxs5(Pressable4, { onPress: () => onSelect(k), style: styles5.item, children: [
           /* @__PURE__ */ jsx5(Text5, { style: styles5.itemMood, children: e.mood !== void 0 ? MOODS[e.mood].emoji : "📝" }),
           /* @__PURE__ */ jsxs5(View5, { style: { flex: 1 }, children: [
-            /* @__PURE__ */ jsx5(Text5, { style: styles5.itemDate, children: shortDate(k) }),
-            /* @__PURE__ */ jsx5(Text5, { style: styles5.itemText, numberOfLines: 1, children: first || "（気分だけ記録）" })
+            /* @__PURE__ */ jsxs5(Text5, { style: styles5.itemDate, children: [
+              shortDate(k),
+              e.photos ? `　📷 ${e.photos}枚` : ""
+            ] }),
+            /* @__PURE__ */ jsx5(Text5, { style: styles5.itemText, numberOfLines: 1, children: first || (e.photos ? "（写真だけ）" : "（気分だけ記録）") })
           ] })
         ] }, k);
       })
@@ -700,6 +830,33 @@ var styles5 = StyleSheet5.create({
     lineHeight: 26
   },
   status: { color: colors.textMuted, fontSize: 12, marginTop: 8 },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  thumb: { width: "100%", height: "100%", borderRadius: 12, backgroundColor: colors.surfaceHigh },
+  remove: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  removeText: { color: "#fff", fontSize: 15, fontWeight: "700", marginTop: -1 },
+  add: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  addPlus: { color: colors.accent, fontSize: 26, fontWeight: "300" },
+  addText: { color: colors.textSub, fontSize: 11, marginTop: 2, fontWeight: "600" },
+  viewer: { flex: 1, backgroundColor: "rgba(0,0,0,0.92)", alignItems: "center", justifyContent: "center", padding: 16 },
+  viewerHint: { color: colors.textMuted, fontSize: 12, marginTop: 16 },
   item: {
     flexDirection: "row",
     alignItems: "center",
@@ -744,51 +901,18 @@ function DiaryTabIcon({ color }) {
   ] });
 }
 
-// ../../../../../../home/claude/schedule-app/src/storage.ts
-import AsyncStorage from "@react-native-async-storage/async-storage";
-var KEY = "schedule.v1";
-async function loadSchedules() {
-  try {
-    const raw = await AsyncStorage.getItem(KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
-async function saveSchedules(map) {
-  try {
-    await AsyncStorage.setItem(KEY, JSON.stringify(map));
-  } catch {
-  }
-}
-var DIARY_KEY = "diary.v1";
-async function loadDiary() {
-  try {
-    const raw = await AsyncStorage.getItem(DIARY_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
-async function saveDiary(map) {
-  try {
-    await AsyncStorage.setItem(DIARY_KEY, JSON.stringify(map));
-  } catch {
-  }
-}
-
 // ../../../../../../home/claude/schedule-app/App.tsx
 import { Fragment as Fragment2, jsx as jsx7, jsxs as jsxs7 } from "react/jsx-runtime";
 function useNow() {
   const [now, setNow] = useState4(() => /* @__PURE__ */ new Date());
-  useEffect2(() => {
+  useEffect3(() => {
     const t = setInterval(() => setNow(/* @__PURE__ */ new Date()), 3e4);
     return () => clearInterval(t);
   }, []);
   return now;
 }
 function Main() {
-  const { width } = useWindowDimensions();
+  const { width } = useWindowDimensions2();
   const now = useNow();
   const todayKey = dateKey(now);
   const tomorrowKey = dateKey(addDays(now, 1));
@@ -803,7 +927,7 @@ function Main() {
   const toastTimer = useRef2(null);
   const [diary, setDiary] = useState4({});
   const [diaryLoaded, setDiaryLoaded] = useState4(false);
-  useEffect2(() => {
+  useEffect3(() => {
     loadSchedules().then((s) => {
       setSchedules(s);
       setLoaded(true);
@@ -813,10 +937,10 @@ function Main() {
       setDiaryLoaded(true);
     });
   }, []);
-  useEffect2(() => {
+  useEffect3(() => {
     if (loaded) saveSchedules(schedules);
   }, [schedules, loaded]);
-  useEffect2(() => {
+  useEffect3(() => {
     if (!diaryLoaded) return;
     const t = setTimeout(() => saveDiary(diary), 400);
     return () => clearTimeout(t);
@@ -836,7 +960,7 @@ function Main() {
   const center = describeCenter(events, nowMin);
   const [half, setHalf] = useState4(0);
   const autoHalf = defaultHalf(events, nowMin);
-  useEffect2(() => {
+  useEffect3(() => {
     setHalf(autoHalf);
   }, [selectedKey]);
   const halfCounts = [0, 1].map((h) => events.filter((e) => e.end > h * 720 && e.start < (h + 1) * 720).length);
