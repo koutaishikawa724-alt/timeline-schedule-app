@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -6,18 +6,7 @@ import CircleSchedule, { defaultHalf, describeCenter } from './src/components/Ci
 import CalendarView from './src/components/CalendarView';
 import EventList from './src/components/EventList';
 import EventEditor from './src/components/EventEditor';
-import BriefingOverlay from './src/components/BriefingOverlay';
-import { CalendarTabIcon, CircleTabIcon, VoiceIcon } from './src/components/TabIcons';
-import SettingsSheet from './src/components/SettingsSheet';
-import { defaultSettings, loadSettings, saveSettings, Settings } from './src/settings';
-import {
-  aiBriefingEnabled,
-  BriefingHandle,
-  BriefingSegment,
-  buildBriefing,
-  fetchAiBriefing,
-  playBriefing,
-} from './src/briefing';
+import { CalendarTabIcon, CircleTabIcon } from './src/components/TabIcons';
 import { addDays, dateKey, fromKey, nowMinutes, weekday } from './src/date';
 import { loadSchedules, saveSchedules } from './src/storage';
 import { ScheduleEvent, ScheduleMap } from './src/types';
@@ -46,20 +35,12 @@ function Main() {
   const [tab, setTab] = useState<Tab>('circle');
   const [editing, setEditing] = useState<ScheduleEvent | undefined>();
   const [editorOpen, setEditorOpen] = useState(false);
-  // 下に出るお知らせ。'saved' = 保存後の読み上げ案内、'deleted' = 削除の取り消し
+  // 下に出るお知らせ。'saved' = 保存した、'deleted' = 削除の取り消し
   const [toast, setToast] = useState<null | 'saved' | 'deleted'>(null);
   const [undo, setUndo] = useState<{ key: string; events: ScheduleEvent[]; label: string } | null>(null);
-  const [settings, setSettings] = useState<Settings>(defaultSettings);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [briefing, setBriefing] = useState<BriefingSegment[] | null>(null);
-  const [briefIndex, setBriefIndex] = useState(0);
-  const briefHandle = useRef<BriefingHandle | null>(null);
-  const briefRun = useRef(0);
-
   useEffect(() => {
-    loadSettings().then(setSettings);
     loadSchedules().then((s) => {
       setSchedules(s);
       setLoaded(true);
@@ -138,27 +119,6 @@ function Main() {
     setToast(null);
   };
 
-  const startBriefing = useCallback(async () => {
-    setToast(null);
-    const run = ++briefRun.current;
-    setBriefIndex(-1); // -1 = オープニングのタイトル
-    setBriefing([]); // 空 = 原稿を準備中
-    const ai = await fetchAiBriefing(selectedKey, events, dayLabel);
-    if (run !== briefRun.current) return; // 準備中に停止された
-    const segs = ai ?? buildBriefing(selectedKey, events, dayLabel, { name: settings.name, style: settings.style });
-    setBriefing(segs);
-    briefHandle.current = playBriefing(segs, setBriefIndex, () => {
-      briefHandle.current = null;
-      setBriefing(null);
-    });
-  }, [selectedKey, events, dayLabel, settings]);
-
-  const stopBriefing = () => {
-    briefRun.current++;
-    if (briefHandle.current) briefHandle.current.stop();
-    else setBriefing(null);
-  };
-
   const defaultStart = useMemo(() => {
     const sorted = [...events].sort((a, b) => a.start - b.start);
     const last = sorted[sorted.length - 1];
@@ -175,9 +135,6 @@ function Main() {
             <Text style={styles.kicker}>{dayLabel ? (dayLabel === '今日' ? 'TODAY' : 'TOMORROW') : 'SCHEDULE'}</Text>
             <Text style={styles.date}>{dateTitle}</Text>
           </View>
-          <Pressable onPress={() => setSettingsOpen(true)} style={styles.gear} hitSlop={8} accessibilityLabel="ブリーフィング設定">
-            <VoiceIcon color={colors.textSub} />
-          </Pressable>
         </View>
 
         <View style={styles.segment}>
@@ -237,18 +194,6 @@ function Main() {
           </View>
         )}
 
-        <Pressable onPress={startBriefing} style={({ pressed }) => [styles.briefBtn, pressed && { opacity: 0.8 }]}>
-          <View style={styles.playIcon}>
-            <Text style={styles.playGlyph}>▶</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.briefTitle}>ブリーフィングを見る</Text>
-            <Text style={styles.briefSub}>
-              {dayLabel ?? 'この日'}の予定 {events.length}件 を{aiBriefingEnabled ? ' AI が' : ''}映画のオープニング風に紹介
-            </Text>
-          </View>
-        </Pressable>
-
         <View style={styles.sectionRow}>
           <Text style={styles.section}>タイムライン</Text>
           {events.length > 1 && (
@@ -263,9 +208,6 @@ function Main() {
       {toast === 'saved' && (
         <View style={styles.toast}>
           <Text style={styles.toastText}>スケジュールを更新しました</Text>
-          <Pressable onPress={startBriefing} hitSlop={8}>
-            <Text style={styles.toastAction}>▶ 読み上げる</Text>
-          </Pressable>
         </View>
       )}
       {toast === 'deleted' && undo && (
@@ -307,25 +249,6 @@ function Main() {
         onClose={() => setEditorOpen(false)}
       />
 
-      <SettingsSheet
-        visible={settingsOpen}
-        settings={settings}
-        onChange={(next) => {
-          setSettings(next);
-          saveSettings(next);
-        }}
-        onClose={() => setSettingsOpen(false)}
-      />
-
-      <BriefingOverlay
-        visible={briefing !== null}
-        segments={briefing ?? []}
-        index={briefIndex}
-        events={events}
-        title={`${dayLabel ?? ''} ${dateTitle}`.trim()}
-        onStop={stopBriefing}
-        onSkip={() => briefHandle.current?.skip()}
-      />
     </SafeAreaView>
   );
 }
@@ -342,16 +265,6 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   scroll: { padding: 20, paddingBottom: 140, width: '100%', maxWidth: 560, alignSelf: 'center' },
   headerRow: { flexDirection: 'row', alignItems: 'center' },
-  gear: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   kicker: { color: colors.accent, fontSize: 12, fontWeight: '700', letterSpacing: 5 },
   date: { color: colors.text, fontSize: 30, fontWeight: '800', marginTop: 4 },
   segment: {
@@ -382,28 +295,6 @@ const styles = StyleSheet.create({
   halfActive: { backgroundColor: colors.accent },
   halfText: { color: colors.textMuted, fontSize: 13, fontWeight: '700' },
   halfTextActive: { color: '#fff' },
-  briefBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    marginTop: 18,
-    padding: 16,
-    borderRadius: 20,
-    backgroundColor: colors.accentSoft,
-    borderWidth: 1,
-    borderColor: 'rgba(108,140,255,0.35)',
-  },
-  playIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  playGlyph: { color: '#fff', fontSize: 16, marginLeft: 3 },
-  briefTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
-  briefSub: { color: colors.textSub, fontSize: 12, marginTop: 2 },
   sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   clearAll: { color: colors.danger, fontSize: 12, fontWeight: '700' },
   section: { color: colors.textSub, fontSize: 12, letterSpacing: 2, marginTop: 26, marginBottom: 10, fontWeight: '700' },

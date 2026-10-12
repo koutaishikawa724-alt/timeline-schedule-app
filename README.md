@@ -3,13 +3,10 @@
 Expo（React Native + TypeScript）製。iOS / Android / Web 共通コード。
 
 ## できること（v0.1）
-- 今日・明日の予定を追加／編集／削除（時・分・長さ・色をタップで選択）
-- 24時間のサークル型タイムスケジュール（現在時刻の針、重なりは内側の輪へ）
+- 今日・明日の予定を追加／編集（時・分・長さ・色をタップで選択）
+- タイムラインの各予定の × で削除、「すべて消す」でその日をまとめて削除、「元に戻す」で取り消し
+- 時計と同じ並び（12時が上）のサークル型タイムスケジュール。午前／午後を切り替え、現在時刻の針つき
 - 月カレンダー（予定のある日に色ドット、タップでその日を表示）
-- ブリーフィング読み上げ：読み上げサーバーがあれば Claude が原稿を書き、OpenAI TTS の声で再生。無ければアプリ内テンプレート＋端末の日本語音声。読み上げ中の予定を円の上でハイライト
-- ナレーション設定（右上の波形ボタン）：呼びかける名前、語り口（ミッション／ラジオDJ／クール）、端末の声の選択、速さ・高さ、開始の効果音
-- 今日の途中で聞くと、終わった予定は件数だけ伝え、次の予定と「開始まであと何分」を読み上げ
-- 予定保存後に「▶ 読み上げる」のお知らせ
 - 端末内に自動保存（AsyncStorage）
 
 ## 動かし方
@@ -25,31 +22,12 @@ Webアプリ版を Vercel（無料）で公開し、Safari の「ホーム画面
 2. 「Add New → Project」で `timeline-schedule-app` を Import（ビルド設定は `vercel.json` から自動）
 3. 「Deploy」→ できた `〜.vercel.app` を Safari で開き、共有ボタン →「ホーム画面に追加」
 
-予定や設定はそのiPhoneの中だけに保存されます。
-
-## AI ナレーション（読み上げサーバー）
-APIキーはアプリに入れず、`server/` の小さなサーバーだけが持ちます。
-
-```
-cd server
-npm install
-cp .env.example .env   # ANTHROPIC_API_KEY と OPENAI_API_KEY を記入
-node --env-file=.env --import tsx src/index.ts
-```
-アプリ側はルートの `.env` に `EXPO_PUBLIC_BRIEFING_API_URL=http://<PCのIP>:8787` を書いて `npx expo start`。
-サーバーに届かない・失敗したときは自動でテンプレート原稿＋端末音声に切り替わります。
-APIを使わずに動作確認するには `BRIEFING_MOCK=1 MOCK_AUDIO=1 npx tsx src/index.ts`。
-
-- 原稿: `claude-opus-5-5`（effort low、構造化出力で1文ずつ、拒否時は自動フォールバック）
-- 音声: `gpt-4o-mini-tts`（低めで落ち着いたナレーター調の指示付き）
+予定はそのiPhoneの中だけに保存されます。
 
 ## 主なファイル
 - `App.tsx` 画面全体
 - `src/components/CircleSchedule.tsx` 円形タイムスケジュール
 - `src/components/CalendarView.tsx` カレンダー
 - `src/components/EventEditor.tsx` 予定入力シート
-- `src/components/BriefingOverlay.tsx` 読み上げ画面
-- `src/briefing.ts` 読み上げ原稿（サーバー呼び出し／テンプレート）と再生
-- `src/components/SettingsSheet.tsx` ナレーション設定
-- `scripts/make-intro-sound.mjs` 効果音（assets/sounds/intro.wav）を合成するスクリプト
-- `server/src/index.ts` 読み上げサーバー（Claude で原稿、OpenAI TTS で音声）
+- `src/components/EventList.tsx` タイムライン（削除ボタンつき）
+- `snack/App.js` Expo Snack 用の1ファイル版（`scripts/build-snack.mjs` で作る）

@@ -3,8 +3,8 @@
 
 
 // ../../../../../../home/claude/schedule-app/App.tsx
-import { useCallback, useEffect as useEffect3, useMemo as useMemo2, useRef as useRef3, useState as useState4 } from "react";
-import { Pressable as Pressable6, ScrollView as ScrollView3, StyleSheet as StyleSheet7, Text as Text7, useWindowDimensions as useWindowDimensions2, View as View7 } from "react-native";
+import { useEffect as useEffect2, useMemo as useMemo2, useRef as useRef2, useState as useState3 } from "react";
+import { Pressable as Pressable4, ScrollView as ScrollView2, StyleSheet as StyleSheet5, Text as Text5, useWindowDimensions, View as View5 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
@@ -52,19 +52,6 @@ function formatTime(min) {
   const h = Math.floor(min / 60);
   const m = min % 60;
   return `${h}:${`${m}`.padStart(2, "0")}`;
-}
-function speakTime(min) {
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return m === 0 ? `${h}時` : `${h}時${m}分`;
-}
-function speakDuration(min) {
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  if (h === 0) return `${m}分`;
-  if (m === 0) return `${h}時間`;
-  if (m === 30) return `${h}時間半`;
-  return `${h}時間${m}分`;
 }
 function nowMinutes(d = /* @__PURE__ */ new Date()) {
   return d.getHours() * 60 + d.getMinutes();
@@ -587,488 +574,32 @@ var styles4 = StyleSheet4.create({
   buttonText: { fontSize: 16, fontWeight: "700" }
 });
 
-// ../../../../../../home/claude/schedule-app/src/components/BriefingOverlay.tsx
-import { useEffect as useEffect2, useRef as useRef2, useState as useState3 } from "react";
-import { Animated, Easing, Modal as Modal2, Pressable as Pressable4, StyleSheet as StyleSheet5, Text as Text5, useWindowDimensions, View as View5 } from "react-native";
-
-// ../../../../../../home/claude/schedule-app/src/briefing.ts
-var API_URL = void 0;
-var APP_TOKEN = void 0;
-var aiBriefingEnabled = !!API_URL;
-async function fetchAiBriefing(key, events, dayLabel) {
-  if (!API_URL) return null;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 3e4);
-  try {
-    const res = await fetch(`${API_URL}/briefing`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...APP_TOKEN ? { "X-App-Token": APP_TOKEN } : {} },
-      body: JSON.stringify({
-        date: key,
-        dayLabel,
-        events: events.map(({ id, title, start, end }) => ({ id, title, start, end }))
-      }),
-      signal: controller.signal
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (!data.segments?.length) return null;
-    return data.segments.map((s) => ({ text: s.text, eventId: s.eventId ?? void 0, audioUrl: s.audioUrl }));
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-var pick = (list) => list[Math.floor(Math.random() * list.length)];
-var rotate = (n, list) => list[n % list.length];
-function greeting(hour, name) {
-  const who = name ? `${name}さん、` : "";
-  if (hour < 5) return `${who}夜分にお疲れさまです。`;
-  if (hour < 11) return `おはようございます、${who || ""}`.replace(/、$/, "。");
-  if (hour < 18) return `こんにちは、${who || ""}`.replace(/、$/, "。");
-  return `こんばんは、${who || ""}`.replace(/、$/, "。");
-}
-var PHRASES = {
-  mission: {
-    open: (s) => [`${s}のブリーフィングを開始します。`, `${s}のミッションを確認しましょう。`, `これより、${s}の作戦概要をお伝えします。`],
-    count: (d, n) => `${d}。ミッションは全部で、${n}件。`,
-    only: (t, ti, dur) => `唯一のミッションは、${t}から。「${ti}」。${dur}の予定です。`,
-    first: (t, ti) => [`最初のミッションは、${t}。「${ti}」。`, `作戦開始は${t}。「${ti}」。`],
-    resume: (t, ti) => `次のミッションは、${t}。「${ti}」。`,
-    middle: (t, ti, dur) => [`続いて${t}、「${ti}」。${dur}です。`, `${t}、次の目標は「${ti}」。`, `次は${t}。「${ti}」。`],
-    last: (t, ti) => [`そして最終ミッションは、${t}。「${ti}」。`, `締めくくりは${t}、「${ti}」。`],
-    free: (d) => [`その後、${d}の待機時間。しっかりチャージを。`, `ここで${d}のブレイク。`, `${d}の空白。自由に使ってください。`],
-    overlap: "警告。次の予定と時間が重なっています。",
-    busy: "かなりタイトなスケジュールです。ペース配分に注意してください。",
-    empty: ["ミッションはありません。完全なフリー。思い切り楽しんでください。", "白紙のキャンバスです。自由に描いてください。"],
-    close: (n, s, name) => [
-      `以上、全${n}件。準備は整いました。最高の一日を。`,
-      `ブリーフィングは以上。${name ? `${name}さん、` : ""}健闘を祈ります。`,
-      `以上です。すべては、あなたの手の中に。いってらっしゃい。`
-    ]
-  },
-  dj: {
-    open: (s) => [`さあ始まりました、${s}のスケジュール・カウントダウン！`, `${s}のプレイリスト、いってみましょう！`],
-    count: (d, n) => `${d}。本日のラインナップは${n}件！`,
-    only: (t, ti, dur) => `本日の一曲はこちら。${t}から、「${ti}」。${dur}です！`,
-    first: (t, ti) => [`トップバッターは${t}、「${ti}」！`, `一発目は${t}から、「${ti}」！`],
-    resume: (t, ti) => `お次は${t}、「${ti}」！`,
-    middle: (t, ti, dur) => [`続いては${t}、「${ti}」。${dur}お付き合いください。`, `お次は${t}、「${ti}」！`, `${t}からは「${ti}」でいきましょう。`],
-    last: (t, ti) => [`そしてラストナンバーは${t}、「${ti}」！`, `トリを飾るのは${t}、「${ti}」！`],
-    free: (d) => [`ここで${d}のコーヒーブレイク。`, `${d}のフリータイム、ひと息ついてください。`, `${d}の休憩タイムです。`],
-    overlap: "おっと、次の予定と時間がかぶってますよ！",
-    busy: "今日はぎっしり詰まってますね。水分補給も忘れずに！",
-    empty: ["今日は予定なし！好きな曲をかけて、自由に過ごしちゃいましょう。"],
-    close: (n, s, name) => [
-      `以上、${n}件のラインナップでお送りしました！${name ? `${name}さん、` : ""}いってらっしゃい！`,
-      `${s}も最高の一日になりますように。それではまた！`
-    ]
-  },
-  cool: {
-    open: (s) => [`${s}の予定を、静かに確認しておきましょう。`, `${s}のタイムラインです。`],
-    count: (d, n) => `${d}。予定は${n}件。`,
-    only: (t, ti, dur) => `${t}から、「${ti}」。${dur}。それだけです。`,
-    first: (t, ti) => [`まず、${t}。「${ti}」。`, `始まりは${t}。「${ti}」。`],
-    resume: (t, ti) => `次は、${t}。「${ti}」。`,
-    middle: (t, ti, dur) => [`${t}。「${ti}」。${dur}。`, `次に、${t}。「${ti}」。`, `${t}、「${ti}」。`],
-    last: (t, ti) => [`最後に、${t}。「${ti}」。`, `終わりは${t}。「${ti}」。`],
-    free: (d) => [`そのあと、${d}の余白。`, `${d}、何もない時間。`, `${d}の静けさ。`],
-    overlap: "次の予定と、時間が重なっています。",
-    busy: "詰まった一日です。焦らず、ひとつずつ。",
-    empty: ["予定はありません。ゆっくり過ごしてください。"],
-    close: (n, s, name) => [`以上、${n}件。${name ? `${name}さん、` : ""}良い一日を。`, "準備は、できています。"]
-  }
-};
-function buildBriefing(key, events, dayLabel, opts = {}, now = /* @__PURE__ */ new Date()) {
-  const name = opts.name?.trim() ?? "";
-  const P = PHRASES[opts.style ?? "mission"];
-  const d = fromKey(key);
-  const dateText = `${d.getMonth() + 1}月${d.getDate()}日、${weekday(d)}曜日`;
-  const all = [...events].sort((a, b) => a.start - b.start);
-  const subject = dayLabel === "明日" ? "明日" : dayLabel === "今日" ? "本日" : "この日";
-  const segs = [];
-  let freeCount = Math.floor(Math.random() * 3);
-  segs.push({ text: `${greeting(now.getHours(), name)}${pick(P.open(subject))}` });
-  if (all.length === 0) {
-    segs.push({ text: `${dateText}。` });
-    segs.push({ text: pick(P.empty) });
-    return segs;
-  }
-  const nowMin = now.getHours() * 60 + now.getMinutes();
-  const done = dayLabel === "今日" ? all.filter((e) => e.end <= nowMin) : [];
-  const sorted = all.filter((e) => !done.includes(e));
-  segs.push({ text: P.count(dateText, all.length) });
-  if (done.length > 0 && sorted.length > 0) {
-    segs.push({ text: `すでに${done.length}件が完了。残りは${sorted.length}件です。` });
-  }
-  if (sorted.length === 0) {
-    segs.push({ text: `${subject}の予定は、すべて完了しました。お疲れさまでした。` });
-    return segs;
-  }
-  const busyMin = all.reduce((sum, e) => sum + (e.end - e.start), 0);
-  if (all.length >= 6 || busyMin >= 9 * 60) segs.push({ text: P.busy });
-  sorted.forEach((ev, i) => {
-    const time = speakTime(ev.start);
-    const dur = speakDuration(ev.end - ev.start);
-    let line;
-    if (sorted.length === 1) line = P.only(time, ev.title, dur);
-    else if (i === 0) line = done.length > 0 ? P.resume(time, ev.title) : pick(P.first(time, ev.title));
-    else if (i === sorted.length - 1) line = pick(P.last(time, ev.title));
-    else line = rotate(i - 1, P.middle(time, ev.title, dur));
-    segs.push({ text: line, eventId: ev.id });
-    if (i === 0 && dayLabel === "今日") {
-      if (ev.start <= nowMin) segs.push({ text: "これは、まさに今、進行中です。", eventId: ev.id });
-      else if (ev.start - nowMin <= 180) segs.push({ text: `開始まで、あと${speakDuration(ev.start - nowMin)}。`, eventId: ev.id });
-    }
-    const next = sorted[i + 1];
-    if (next && next.start - ev.end >= 120) {
-      segs.push({ text: rotate(freeCount++, P.free(speakDuration(next.start - ev.end))) });
-    } else if (next && next.start < ev.end) {
-      segs.push({ text: P.overlap });
-    }
-  });
-  segs.push({ text: pick(P.close(all.length, subject, name)) });
-  return segs;
-}
-function segmentDuration(text) {
-  return Math.min(6e3, Math.max(2400, 1200 + text.length * 110));
-}
-function playBriefing(segments, onSegment, onFinish) {
-  let index = -1;
-  let timer = null;
-  let finished = false;
-  const finish = () => {
-    if (finished) return;
-    finished = true;
-    if (timer) clearTimeout(timer);
-    onFinish();
-  };
-  const show = (i) => {
-    if (timer) clearTimeout(timer);
-    if (finished) return;
-    if (i >= segments.length) return finish();
-    index = i;
-    onSegment(i);
-    timer = setTimeout(() => show(i + 1), segmentDuration(segments[i].text));
-  };
-  timer = setTimeout(() => show(0), 900);
-  return { stop: finish, skip: () => show(index + 1) };
-}
-
-// ../../../../../../home/claude/schedule-app/src/components/BriefingOverlay.tsx
-import { Fragment, jsx as jsx5, jsxs as jsxs5 } from "react/jsx-runtime";
-var TYPE_MS = 42;
-var BAR = 54;
-function useTypewriter(text, key) {
-  const [shown, setShown] = useState3("");
-  useEffect2(() => {
-    setShown("");
-    if (!text) return;
-    let n = 0;
-    const t = setInterval(() => {
-      n++;
-      setShown(text.slice(0, n));
-      if (n >= text.length) clearInterval(t);
-    }, TYPE_MS);
-    return () => clearInterval(t);
-  }, [text, key]);
-  return shown;
-}
-function BriefingOverlay({ visible, segments, index, events, title, onStop, onSkip }) {
-  const { width } = useWindowDimensions();
-  const bars = useRef2(new Animated.Value(0)).current;
-  const pulse = useRef2(new Animated.Value(0)).current;
-  const enter = useRef2(new Animated.Value(0)).current;
-  const progress = useRef2(new Animated.Value(0)).current;
-  useEffect2(() => {
-    if (!visible) return;
-    bars.setValue(0);
-    Animated.timing(bars, { toValue: 1, duration: 700, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 1100, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0, duration: 1100, easing: Easing.inOut(Easing.quad), useNativeDriver: true })
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [visible, bars, pulse]);
-  const preparing = segments.length === 0;
-  const opening = index < 0 || preparing;
-  const seg = opening ? void 0 : segments[index];
-  useEffect2(() => {
-    enter.setValue(0);
-    Animated.timing(enter, { toValue: 1, duration: 600, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
-    progress.setValue(0);
-    if (seg) {
-      Animated.timing(progress, { toValue: 1, duration: segmentDuration(seg.text), easing: Easing.linear, useNativeDriver: false }).start();
-    }
-  }, [index, preparing, enter, progress, seg]);
-  const typed = useTypewriter(seg?.text ?? "", index);
-  const ev = events.find((e) => e.id === seg?.eventId);
-  const accent = ev?.color ?? colors.accent;
-  const halfRef = useRef2(defaultHalf(events));
-  if (ev) halfRef.current = ev.start >= 720 ? 1 : 0;
-  else if (opening) halfRef.current = defaultHalf(events);
-  const barHeight = bars.interpolate({ inputRange: [0, 1], outputRange: [0, BAR] });
-  const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
-  const glow = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.12, 0.35] });
-  const rise = enter.interpolate({ inputRange: [0, 1], outputRange: [18, 0] });
-  const zoom = enter.interpolate({ inputRange: [0, 1], outputRange: [1.15, 1] });
-  const barWidth = progress.interpolate({ inputRange: [0, 1], outputRange: [0, Math.min(width, 560) - 56] });
-  const dial = Math.min(260, width - 110);
-  return /* @__PURE__ */ jsx5(Modal2, { visible, animationType: "fade", transparent: true, onRequestClose: onStop, children: /* @__PURE__ */ jsxs5(Pressable4, { style: styles5.root, onPress: opening ? void 0 : onSkip, children: [
-    /* @__PURE__ */ jsx5(Animated.View, { style: [styles5.bar, { top: 0, height: barHeight }] }),
-    /* @__PURE__ */ jsx5(Animated.View, { style: [styles5.bar, { bottom: 0, height: barHeight }] }),
-    opening ? /* @__PURE__ */ jsxs5(Animated.View, { style: [styles5.opening, { opacity: enter, transform: [{ scale: zoom }] }], children: [
-      /* @__PURE__ */ jsx5(Text5, { style: styles5.kicker, children: "TODAY’S BRIEFING" }),
-      /* @__PURE__ */ jsx5(View5, { style: styles5.rule }),
-      /* @__PURE__ */ jsx5(Text5, { style: styles5.openTitle, children: title }),
-      /* @__PURE__ */ jsx5(Text5, { style: styles5.openSub, children: preparing ? "原稿を準備中…" : `予定 ${events.length}件` })
-    ] }) : /* @__PURE__ */ jsxs5(Fragment, { children: [
-      /* @__PURE__ */ jsx5(Text5, { style: styles5.sceneLabel, children: `SCENE ${String(index + 1).padStart(2, "0")} / ${String(segments.length).padStart(2, "0")}` }),
-      /* @__PURE__ */ jsxs5(Animated.View, { style: [styles5.stage, { width: dial + 30, height: dial + 30, opacity: enter }], children: [
-        /* @__PURE__ */ jsx5(
-          Animated.View,
-          {
-            style: [
-              styles5.glow,
-              { width: dial - 30, height: dial - 30, borderRadius: dial, backgroundColor: accent, opacity: glow, transform: [{ scale }] }
-            ]
-          }
-        ),
-        /* @__PURE__ */ jsx5(
-          CircleSchedule,
-          {
-            events,
-            size: dial,
-            highlightId: seg?.eventId,
-            half: halfRef.current,
-            centerTitle: ev ? formatTime(ev.start) : `${index + 1}/${segments.length}`,
-            centerSub: ev ? ev.title : "BRIEFING"
-          }
-        )
-      ] }),
-      /* @__PURE__ */ jsxs5(Animated.View, { style: { opacity: enter, transform: [{ translateY: rise }] }, children: [
-        ev ? /* @__PURE__ */ jsx5(Text5, { style: [styles5.eventTag, { color: accent }], children: `${formatTime(ev.start)} – ${formatTime(ev.end)}` }) : null,
-        /* @__PURE__ */ jsxs5(Text5, { style: styles5.line, children: [
-          typed,
-          /* @__PURE__ */ jsx5(Text5, { style: { color: accent }, children: "▍" })
-        ] })
-      ] }),
-      /* @__PURE__ */ jsx5(View5, { style: styles5.track, children: /* @__PURE__ */ jsx5(Animated.View, { style: [styles5.fill, { width: barWidth, backgroundColor: accent }] }) }),
-      /* @__PURE__ */ jsx5(Text5, { style: styles5.hint, children: "タップで次へ" })
-    ] }),
-    /* @__PURE__ */ jsx5(Pressable4, { onPress: onStop, style: styles5.close, hitSlop: 10, children: /* @__PURE__ */ jsx5(Text5, { style: styles5.closeText, children: "閉じる" }) })
-  ] }) });
-}
-var styles5 = StyleSheet5.create({
-  root: { flex: 1, backgroundColor: "#05060C", alignItems: "center", justifyContent: "center", padding: 28 },
-  bar: { position: "absolute", left: 0, right: 0, backgroundColor: "#000", zIndex: 2 },
-  opening: { alignItems: "center" },
-  kicker: { color: colors.accent, fontSize: 12, letterSpacing: 8, fontWeight: "700" },
-  rule: { width: 48, height: 2, backgroundColor: colors.accent, marginVertical: 18, borderRadius: 1 },
-  openTitle: { color: colors.text, fontSize: 30, fontWeight: "800", letterSpacing: 2, textAlign: "center" },
-  openSub: { color: colors.textSub, fontSize: 14, marginTop: 12, letterSpacing: 3 },
-  sceneLabel: { color: colors.textMuted, fontSize: 11, letterSpacing: 5, fontWeight: "700" },
-  stage: { alignItems: "center", justifyContent: "center", marginVertical: 18 },
-  glow: { position: "absolute" },
-  eventTag: { fontSize: 13, fontWeight: "700", letterSpacing: 3, textAlign: "center", marginBottom: 8 },
-  line: { color: colors.text, fontSize: 21, lineHeight: 33, fontWeight: "600", textAlign: "center", minHeight: 100, maxWidth: 480 },
-  track: { height: 2, alignSelf: "stretch", maxWidth: 504, backgroundColor: colors.border, marginTop: 18, borderRadius: 1, overflow: "hidden" },
-  fill: { height: 2 },
-  hint: { color: colors.textMuted, fontSize: 11, letterSpacing: 2, marginTop: 10 },
-  close: {
-    position: "absolute",
-    bottom: BAR + 18,
-    paddingHorizontal: 28,
-    paddingVertical: 10,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: colors.border,
-    zIndex: 3
-  },
-  closeText: { color: colors.textSub, fontSize: 13, fontWeight: "600", letterSpacing: 3 }
-});
-
 // ../../../../../../home/claude/schedule-app/src/components/TabIcons.tsx
 import Svg2, { Circle as Circle2, Line as Line2, Path as Path2, Rect } from "react-native-svg";
-import { jsx as jsx6, jsxs as jsxs6 } from "react/jsx-runtime";
+import { jsx as jsx5, jsxs as jsxs5 } from "react/jsx-runtime";
 function CircleTabIcon({ color }) {
-  return /* @__PURE__ */ jsxs6(Svg2, { width: 24, height: 24, viewBox: "0 0 24 24", children: [
-    /* @__PURE__ */ jsx6(Circle2, { cx: 12, cy: 12, r: 8.5, stroke: color, strokeWidth: 2, fill: "none", opacity: 0.45 }),
-    /* @__PURE__ */ jsx6(Path2, { d: "M12 3.5 A8.5 8.5 0 0 1 20.5 12", stroke: color, strokeWidth: 2.4, fill: "none", strokeLinecap: "round" }),
-    /* @__PURE__ */ jsx6(Line2, { x1: 12, y1: 12, x2: 12, y2: 7, stroke: color, strokeWidth: 2, strokeLinecap: "round" }),
-    /* @__PURE__ */ jsx6(Line2, { x1: 12, y1: 12, x2: 15, y2: 14, stroke: color, strokeWidth: 2, strokeLinecap: "round" })
+  return /* @__PURE__ */ jsxs5(Svg2, { width: 24, height: 24, viewBox: "0 0 24 24", children: [
+    /* @__PURE__ */ jsx5(Circle2, { cx: 12, cy: 12, r: 8.5, stroke: color, strokeWidth: 2, fill: "none", opacity: 0.45 }),
+    /* @__PURE__ */ jsx5(Path2, { d: "M12 3.5 A8.5 8.5 0 0 1 20.5 12", stroke: color, strokeWidth: 2.4, fill: "none", strokeLinecap: "round" }),
+    /* @__PURE__ */ jsx5(Line2, { x1: 12, y1: 12, x2: 12, y2: 7, stroke: color, strokeWidth: 2, strokeLinecap: "round" }),
+    /* @__PURE__ */ jsx5(Line2, { x1: 12, y1: 12, x2: 15, y2: 14, stroke: color, strokeWidth: 2, strokeLinecap: "round" })
   ] });
 }
 function CalendarTabIcon({ color }) {
-  return /* @__PURE__ */ jsxs6(Svg2, { width: 24, height: 24, viewBox: "0 0 24 24", children: [
-    /* @__PURE__ */ jsx6(Rect, { x: 3.5, y: 5, width: 17, height: 15, rx: 3, stroke: color, strokeWidth: 2, fill: "none" }),
-    /* @__PURE__ */ jsx6(Line2, { x1: 3.5, y1: 10, x2: 20.5, y2: 10, stroke: color, strokeWidth: 2 }),
-    /* @__PURE__ */ jsx6(Line2, { x1: 8, y1: 3, x2: 8, y2: 7, stroke: color, strokeWidth: 2, strokeLinecap: "round" }),
-    /* @__PURE__ */ jsx6(Line2, { x1: 16, y1: 3, x2: 16, y2: 7, stroke: color, strokeWidth: 2, strokeLinecap: "round" })
+  return /* @__PURE__ */ jsxs5(Svg2, { width: 24, height: 24, viewBox: "0 0 24 24", children: [
+    /* @__PURE__ */ jsx5(Rect, { x: 3.5, y: 5, width: 17, height: 15, rx: 3, stroke: color, strokeWidth: 2, fill: "none" }),
+    /* @__PURE__ */ jsx5(Line2, { x1: 3.5, y1: 10, x2: 20.5, y2: 10, stroke: color, strokeWidth: 2 }),
+    /* @__PURE__ */ jsx5(Line2, { x1: 8, y1: 3, x2: 8, y2: 7, stroke: color, strokeWidth: 2, strokeLinecap: "round" }),
+    /* @__PURE__ */ jsx5(Line2, { x1: 16, y1: 3, x2: 16, y2: 7, stroke: color, strokeWidth: 2, strokeLinecap: "round" })
   ] });
 }
-function VoiceIcon({ color }) {
-  return /* @__PURE__ */ jsx6(Svg2, { width: 22, height: 22, viewBox: "0 0 24 24", children: [
-    [4, 10, 14],
-    [8, 6, 18],
-    [12, 3, 21],
-    [16, 7, 17],
-    [20, 10, 14]
-  ].map(([x, y1, y2]) => /* @__PURE__ */ jsx6(Line2, { x1: x, y1, x2: x, y2, stroke: color, strokeWidth: 2.2, strokeLinecap: "round" }, x)) });
-}
-
-// ../../../../../../home/claude/schedule-app/src/components/SettingsSheet.tsx
-import { KeyboardAvoidingView as KeyboardAvoidingView2, Modal as Modal3, Platform as Platform2, Pressable as Pressable5, ScrollView as ScrollView2, StyleSheet as StyleSheet6, Text as Text6, TextInput as TextInput2, View as View6 } from "react-native";
-
-// ../../../../../../home/claude/schedule-app/src/settings.ts
-import AsyncStorage from "@react-native-async-storage/async-storage";
-var defaultSettings = { name: "", style: "mission" };
-var STYLE_LABELS = {
-  mission: { label: "ミッション", desc: "作戦会議風" },
-  dj: { label: "ラジオDJ", desc: "明るく軽快" },
-  cool: { label: "クール", desc: "静かで渋い" }
-};
-var KEY = "settings.v1";
-async function loadSettings() {
-  try {
-    const raw = await AsyncStorage.getItem(KEY);
-    if (!raw) return defaultSettings;
-    const s = { ...defaultSettings, ...JSON.parse(raw) };
-    return { name: s.name, style: s.style };
-  } catch {
-    return defaultSettings;
-  }
-}
-async function saveSettings(s) {
-  try {
-    await AsyncStorage.setItem(KEY, JSON.stringify(s));
-  } catch {
-  }
-}
-
-// ../../../../../../home/claude/schedule-app/src/components/SettingsSheet.tsx
-import { jsx as jsx7, jsxs as jsxs7 } from "react/jsx-runtime";
-var STYLE_SAMPLE = {
-  mission: "これより、本日の作戦概要をお伝えします。",
-  dj: "さあ始まりました、本日のスケジュール・カウントダウン！",
-  cool: "本日の予定を、静かに確認しておきましょう。"
-};
-function Chip2({ label, sub, active, onPress }) {
-  return /* @__PURE__ */ jsxs7(Pressable5, { onPress, style: [styles6.chip, active && styles6.chipActive], children: [
-    /* @__PURE__ */ jsx7(Text6, { style: [styles6.chipText, active && styles6.chipTextActive], children: label }),
-    sub ? /* @__PURE__ */ jsx7(Text6, { style: [styles6.chipSub, active && { color: "rgba(255,255,255,0.8)" }], children: sub }) : null
-  ] });
-}
-function SettingsSheet({ visible, settings, onChange, onClose }) {
-  const set = (patch) => onChange({ ...settings, ...patch });
-  const sampleText = `${settings.name ? `${settings.name}さん、` : ""}${STYLE_SAMPLE[settings.style]}`;
-  return /* @__PURE__ */ jsx7(Modal3, { visible, transparent: true, animationType: "slide", onRequestClose: onClose, children: /* @__PURE__ */ jsxs7(KeyboardAvoidingView2, { behavior: Platform2.OS === "ios" ? "padding" : void 0, style: styles6.backdrop, children: [
-    /* @__PURE__ */ jsx7(Pressable5, { style: StyleSheet6.absoluteFill, onPress: onClose }),
-    /* @__PURE__ */ jsxs7(View6, { style: styles6.sheet, children: [
-      /* @__PURE__ */ jsx7(View6, { style: styles6.grabber }),
-      /* @__PURE__ */ jsxs7(View6, { style: styles6.headerRow, children: [
-        /* @__PURE__ */ jsx7(Text6, { style: styles6.heading, children: "ブリーフィング設定" }),
-        /* @__PURE__ */ jsx7(Pressable5, { onPress: onClose, hitSlop: 10, children: /* @__PURE__ */ jsx7(Text6, { style: styles6.done, children: "完了" }) })
-      ] }),
-      /* @__PURE__ */ jsxs7(
-        ScrollView2,
-        {
-          showsVerticalScrollIndicator: false,
-          contentContainerStyle: { paddingBottom: 12 },
-          keyboardShouldPersistTaps: "handled",
-          children: [
-            /* @__PURE__ */ jsx7(Text6, { style: styles6.label, children: "呼びかける名前" }),
-            /* @__PURE__ */ jsx7(
-              TextInput2,
-              {
-                value: settings.name,
-                onChangeText: (name) => set({ name }),
-                placeholder: "例：こうた（「こうたさん」と呼びます）",
-                placeholderTextColor: colors.textMuted,
-                style: styles6.input,
-                maxLength: 12
-              }
-            ),
-            /* @__PURE__ */ jsx7(Text6, { style: styles6.label, children: "演出のテイスト" }),
-            /* @__PURE__ */ jsx7(View6, { style: styles6.row, children: Object.keys(STYLE_LABELS).map((k) => /* @__PURE__ */ jsx7(
-              Chip2,
-              {
-                label: STYLE_LABELS[k].label,
-                sub: STYLE_LABELS[k].desc,
-                active: settings.style === k,
-                onPress: () => set({ style: k })
-              },
-              k
-            )) }),
-            /* @__PURE__ */ jsx7(Text6, { style: styles6.label, children: "こんな感じで始まります" }),
-            /* @__PURE__ */ jsxs7(View6, { style: styles6.sample, children: [
-              /* @__PURE__ */ jsx7(Text6, { style: styles6.sampleKicker, children: "BRIEFING" }),
-              /* @__PURE__ */ jsx7(Text6, { style: styles6.sampleText, children: sampleText })
-            ] })
-          ]
-        }
-      )
-    ] })
-  ] }) });
-}
-var styles6 = StyleSheet6.create({
-  backdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.55)" },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    padding: 20,
-    paddingBottom: 32,
-    borderWidth: 1,
-    borderColor: colors.border,
-    width: "100%",
-    maxWidth: 560,
-    maxHeight: "88%",
-    alignSelf: "center"
-  },
-  grabber: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: "center", marginBottom: 14 },
-  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
-  heading: { color: colors.text, fontSize: 18, fontWeight: "700" },
-  done: { color: colors.accent, fontSize: 16, fontWeight: "700" },
-  label: { color: colors.textSub, fontSize: 12, marginTop: 18, marginBottom: 8, letterSpacing: 1 },
-  input: {
-    backgroundColor: colors.surfaceHigh,
-    color: colors.text,
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    fontSize: 16
-  },
-  row: { flexDirection: "row", gap: 8 },
-  chip: { flex: 1, paddingVertical: 10, paddingHorizontal: 6, borderRadius: 12, backgroundColor: colors.surfaceHigh, alignItems: "center" },
-  chipActive: { backgroundColor: colors.accent },
-  chipText: { color: colors.textSub, fontSize: 14, fontWeight: "700" },
-  chipTextActive: { color: "#fff" },
-  chipSub: { color: colors.textMuted, fontSize: 10, marginTop: 2 },
-  sample: {
-    backgroundColor: "#05060C",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingVertical: 22,
-    paddingHorizontal: 18,
-    alignItems: "center"
-  },
-  sampleKicker: { color: colors.accent, fontSize: 11, letterSpacing: 6, fontWeight: "700", marginBottom: 10 },
-  sampleText: { color: colors.text, fontSize: 17, lineHeight: 27, textAlign: "center", fontWeight: "600" },
-  note: { color: colors.textMuted, fontSize: 12, lineHeight: 18, marginTop: 6 }
-});
 
 // ../../../../../../home/claude/schedule-app/src/storage.ts
-import AsyncStorage2 from "@react-native-async-storage/async-storage";
-var KEY2 = "schedule.v1";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+var KEY = "schedule.v1";
 async function loadSchedules() {
   try {
-    const raw = await AsyncStorage2.getItem(KEY2);
+    const raw = await AsyncStorage.getItem(KEY);
     return raw ? JSON.parse(raw) : {};
   } catch {
     return {};
@@ -1076,49 +607,42 @@ async function loadSchedules() {
 }
 async function saveSchedules(map) {
   try {
-    await AsyncStorage2.setItem(KEY2, JSON.stringify(map));
+    await AsyncStorage.setItem(KEY, JSON.stringify(map));
   } catch {
   }
 }
 
 // ../../../../../../home/claude/schedule-app/App.tsx
-import { jsx as jsx8, jsxs as jsxs8 } from "react/jsx-runtime";
+import { jsx as jsx6, jsxs as jsxs6 } from "react/jsx-runtime";
 function useNow() {
-  const [now, setNow] = useState4(() => /* @__PURE__ */ new Date());
-  useEffect3(() => {
+  const [now, setNow] = useState3(() => /* @__PURE__ */ new Date());
+  useEffect2(() => {
     const t = setInterval(() => setNow(/* @__PURE__ */ new Date()), 3e4);
     return () => clearInterval(t);
   }, []);
   return now;
 }
 function Main() {
-  const { width } = useWindowDimensions2();
+  const { width } = useWindowDimensions();
   const now = useNow();
   const todayKey = dateKey(now);
   const tomorrowKey = dateKey(addDays(now, 1));
-  const [schedules, setSchedules] = useState4({});
-  const [loaded, setLoaded] = useState4(false);
-  const [selectedKey, setSelectedKey] = useState4(todayKey);
-  const [tab, setTab] = useState4("circle");
-  const [editing, setEditing] = useState4();
-  const [editorOpen, setEditorOpen] = useState4(false);
-  const [toast, setToast] = useState4(null);
-  const [undo, setUndo] = useState4(null);
-  const [settings, setSettings] = useState4(defaultSettings);
-  const [settingsOpen, setSettingsOpen] = useState4(false);
-  const toastTimer = useRef3(null);
-  const [briefing, setBriefing] = useState4(null);
-  const [briefIndex, setBriefIndex] = useState4(0);
-  const briefHandle = useRef3(null);
-  const briefRun = useRef3(0);
-  useEffect3(() => {
-    loadSettings().then(setSettings);
+  const [schedules, setSchedules] = useState3({});
+  const [loaded, setLoaded] = useState3(false);
+  const [selectedKey, setSelectedKey] = useState3(todayKey);
+  const [tab, setTab] = useState3("circle");
+  const [editing, setEditing] = useState3();
+  const [editorOpen, setEditorOpen] = useState3(false);
+  const [toast, setToast] = useState3(null);
+  const [undo, setUndo] = useState3(null);
+  const toastTimer = useRef2(null);
+  useEffect2(() => {
     loadSchedules().then((s) => {
       setSchedules(s);
       setLoaded(true);
     });
   }, []);
-  useEffect3(() => {
+  useEffect2(() => {
     if (loaded) saveSchedules(schedules);
   }, [schedules, loaded]);
   const events = schedules[selectedKey] ?? [];
@@ -1128,9 +652,9 @@ function Main() {
   const dateTitle = `${sel.getMonth() + 1}月${sel.getDate()}日（${weekday(sel)}）`;
   const nowMin = isToday ? nowMinutes(now) : void 0;
   const center = describeCenter(events, nowMin);
-  const [half, setHalf] = useState4(0);
+  const [half, setHalf] = useState3(0);
   const autoHalf = defaultHalf(events, nowMin);
-  useEffect3(() => {
+  useEffect2(() => {
     setHalf(autoHalf);
   }, [selectedKey]);
   const halfCounts = [0, 1].map((h) => events.filter((e) => e.end > h * 720 && e.start < (h + 1) * 720).length);
@@ -1178,58 +702,36 @@ function Main() {
     setUndo(null);
     setToast(null);
   };
-  const startBriefing = useCallback(async () => {
-    setToast(null);
-    const run = ++briefRun.current;
-    setBriefIndex(-1);
-    setBriefing([]);
-    const ai = await fetchAiBriefing(selectedKey, events, dayLabel);
-    if (run !== briefRun.current) return;
-    const segs = ai ?? buildBriefing(selectedKey, events, dayLabel, { name: settings.name, style: settings.style });
-    setBriefing(segs);
-    briefHandle.current = playBriefing(segs, setBriefIndex, () => {
-      briefHandle.current = null;
-      setBriefing(null);
-    });
-  }, [selectedKey, events, dayLabel, settings]);
-  const stopBriefing = () => {
-    briefRun.current++;
-    if (briefHandle.current) briefHandle.current.stop();
-    else setBriefing(null);
-  };
   const defaultStart = useMemo2(() => {
     const sorted = [...events].sort((a, b) => a.start - b.start);
     const last = sorted[sorted.length - 1];
     if (last) return Math.min(last.end, 23 * 60);
     return isToday ? Math.min(Math.ceil(nowMinutes(now) / 60) * 60, 23 * 60) : 9 * 60;
   }, [events, isToday, now]);
-  return /* @__PURE__ */ jsxs8(SafeAreaView, { style: styles7.root, edges: ["top", "left", "right"], children: [
-    /* @__PURE__ */ jsx8(StatusBar, { style: "light" }),
-    /* @__PURE__ */ jsxs8(ScrollView3, { contentContainerStyle: styles7.scroll, showsVerticalScrollIndicator: false, children: [
-      /* @__PURE__ */ jsxs8(View7, { style: styles7.headerRow, children: [
-        /* @__PURE__ */ jsxs8(View7, { style: { flex: 1 }, children: [
-          /* @__PURE__ */ jsx8(Text7, { style: styles7.kicker, children: dayLabel ? dayLabel === "今日" ? "TODAY" : "TOMORROW" : "SCHEDULE" }),
-          /* @__PURE__ */ jsx8(Text7, { style: styles7.date, children: dateTitle })
-        ] }),
-        /* @__PURE__ */ jsx8(Pressable6, { onPress: () => setSettingsOpen(true), style: styles7.gear, hitSlop: 8, accessibilityLabel: "ブリーフィング設定", children: /* @__PURE__ */ jsx8(VoiceIcon, { color: colors.textSub }) })
-      ] }),
-      /* @__PURE__ */ jsxs8(View7, { style: styles7.segment, children: [
+  return /* @__PURE__ */ jsxs6(SafeAreaView, { style: styles5.root, edges: ["top", "left", "right"], children: [
+    /* @__PURE__ */ jsx6(StatusBar, { style: "light" }),
+    /* @__PURE__ */ jsxs6(ScrollView2, { contentContainerStyle: styles5.scroll, showsVerticalScrollIndicator: false, children: [
+      /* @__PURE__ */ jsx6(View5, { style: styles5.headerRow, children: /* @__PURE__ */ jsxs6(View5, { style: { flex: 1 }, children: [
+        /* @__PURE__ */ jsx6(Text5, { style: styles5.kicker, children: dayLabel ? dayLabel === "今日" ? "TODAY" : "TOMORROW" : "SCHEDULE" }),
+        /* @__PURE__ */ jsx6(Text5, { style: styles5.date, children: dateTitle })
+      ] }) }),
+      /* @__PURE__ */ jsxs6(View5, { style: styles5.segment, children: [
         [
           { key: todayKey, label: "今日" },
           { key: tomorrowKey, label: "明日" }
-        ].map((s) => /* @__PURE__ */ jsx8(
-          Pressable6,
+        ].map((s) => /* @__PURE__ */ jsx6(
+          Pressable4,
           {
             onPress: () => setSelectedKey(s.key),
-            style: [styles7.segItem, selectedKey === s.key && styles7.segActive],
-            children: /* @__PURE__ */ jsx8(Text7, { style: [styles7.segText, selectedKey === s.key && styles7.segTextActive], children: s.label })
+            style: [styles5.segItem, selectedKey === s.key && styles5.segActive],
+            children: /* @__PURE__ */ jsx6(Text5, { style: [styles5.segText, selectedKey === s.key && styles5.segTextActive], children: s.label })
           },
           s.key
         )),
-        !dayLabel && /* @__PURE__ */ jsx8(View7, { style: [styles7.segItem, styles7.segActive], children: /* @__PURE__ */ jsx8(Text7, { style: [styles7.segText, styles7.segTextActive], children: `${sel.getMonth() + 1}/${sel.getDate()}` }) })
+        !dayLabel && /* @__PURE__ */ jsx6(View5, { style: [styles5.segItem, styles5.segActive], children: /* @__PURE__ */ jsx6(Text5, { style: [styles5.segText, styles5.segTextActive], children: `${sel.getMonth() + 1}/${sel.getDate()}` }) })
       ] }),
-      tab === "circle" ? /* @__PURE__ */ jsxs8(View7, { style: styles7.circleWrap, children: [
-        /* @__PURE__ */ jsx8(
+      tab === "circle" ? /* @__PURE__ */ jsxs6(View5, { style: styles5.circleWrap, children: [
+        /* @__PURE__ */ jsx6(
           CircleSchedule,
           {
             events,
@@ -1241,19 +743,19 @@ function Main() {
             half
           }
         ),
-        /* @__PURE__ */ jsx8(View7, { style: styles7.halfSwitch, children: ["午前", "午後"].map((label, h) => /* @__PURE__ */ jsx8(
-          Pressable6,
+        /* @__PURE__ */ jsx6(View5, { style: styles5.halfSwitch, children: ["午前", "午後"].map((label, h) => /* @__PURE__ */ jsx6(
+          Pressable4,
           {
             onPress: () => setHalf(h),
-            style: [styles7.halfItem, half === h && styles7.halfActive],
-            children: /* @__PURE__ */ jsxs8(Text7, { style: [styles7.halfText, half === h && styles7.halfTextActive], children: [
+            style: [styles5.halfItem, half === h && styles5.halfActive],
+            children: /* @__PURE__ */ jsxs6(Text5, { style: [styles5.halfText, half === h && styles5.halfTextActive], children: [
               label,
               halfCounts[h] ? `  ${halfCounts[h]}件` : ""
             ] })
           },
           label
         )) })
-      ] }) : /* @__PURE__ */ jsx8(View7, { style: { marginTop: 18 }, children: /* @__PURE__ */ jsx8(
+      ] }) : /* @__PURE__ */ jsx6(View5, { style: { marginTop: 18 }, children: /* @__PURE__ */ jsx6(
         CalendarView,
         {
           schedules,
@@ -1262,43 +764,26 @@ function Main() {
           onSelect: setSelectedKey
         }
       ) }),
-      /* @__PURE__ */ jsxs8(Pressable6, { onPress: startBriefing, style: ({ pressed }) => [styles7.briefBtn, pressed && { opacity: 0.8 }], children: [
-        /* @__PURE__ */ jsx8(View7, { style: styles7.playIcon, children: /* @__PURE__ */ jsx8(Text7, { style: styles7.playGlyph, children: "▶" }) }),
-        /* @__PURE__ */ jsxs8(View7, { style: { flex: 1 }, children: [
-          /* @__PURE__ */ jsx8(Text7, { style: styles7.briefTitle, children: "ブリーフィングを見る" }),
-          /* @__PURE__ */ jsxs8(Text7, { style: styles7.briefSub, children: [
-            dayLabel ?? "この日",
-            "の予定 ",
-            events.length,
-            "件 を",
-            aiBriefingEnabled ? " AI が" : "",
-            "映画のオープニング風に紹介"
-          ] })
-        ] })
+      /* @__PURE__ */ jsxs6(View5, { style: styles5.sectionRow, children: [
+        /* @__PURE__ */ jsx6(Text5, { style: styles5.section, children: "タイムライン" }),
+        events.length > 1 && /* @__PURE__ */ jsx6(Pressable4, { onPress: () => deleteEvents(), hitSlop: 8, children: /* @__PURE__ */ jsx6(Text5, { style: styles5.clearAll, children: "すべて消す" }) })
       ] }),
-      /* @__PURE__ */ jsxs8(View7, { style: styles7.sectionRow, children: [
-        /* @__PURE__ */ jsx8(Text7, { style: styles7.section, children: "タイムライン" }),
-        events.length > 1 && /* @__PURE__ */ jsx8(Pressable6, { onPress: () => deleteEvents(), hitSlop: 8, children: /* @__PURE__ */ jsx8(Text7, { style: styles7.clearAll, children: "すべて消す" }) })
-      ] }),
-      /* @__PURE__ */ jsx8(EventList, { events, nowMin, onPress: openEdit, onDelete: handleDelete })
+      /* @__PURE__ */ jsx6(EventList, { events, nowMin, onPress: openEdit, onDelete: handleDelete })
     ] }),
-    toast === "saved" && /* @__PURE__ */ jsxs8(View7, { style: styles7.toast, children: [
-      /* @__PURE__ */ jsx8(Text7, { style: styles7.toastText, children: "スケジュールを更新しました" }),
-      /* @__PURE__ */ jsx8(Pressable6, { onPress: startBriefing, hitSlop: 8, children: /* @__PURE__ */ jsx8(Text7, { style: styles7.toastAction, children: "▶ 読み上げる" }) })
+    toast === "saved" && /* @__PURE__ */ jsx6(View5, { style: styles5.toast, children: /* @__PURE__ */ jsx6(Text5, { style: styles5.toastText, children: "スケジュールを更新しました" }) }),
+    toast === "deleted" && undo && /* @__PURE__ */ jsxs6(View5, { style: styles5.toast, children: [
+      /* @__PURE__ */ jsx6(Text5, { style: [styles5.toastText, { flex: 1 }], numberOfLines: 1, children: undo.label }),
+      /* @__PURE__ */ jsx6(Pressable4, { onPress: undoDelete, hitSlop: 8, children: /* @__PURE__ */ jsx6(Text5, { style: styles5.toastAction, children: "元に戻す" }) })
     ] }),
-    toast === "deleted" && undo && /* @__PURE__ */ jsxs8(View7, { style: styles7.toast, children: [
-      /* @__PURE__ */ jsx8(Text7, { style: [styles7.toastText, { flex: 1 }], numberOfLines: 1, children: undo.label }),
-      /* @__PURE__ */ jsx8(Pressable6, { onPress: undoDelete, hitSlop: 8, children: /* @__PURE__ */ jsx8(Text7, { style: styles7.toastAction, children: "元に戻す" }) })
-    ] }),
-    /* @__PURE__ */ jsx8(Pressable6, { onPress: openNew, style: styles7.fab, children: /* @__PURE__ */ jsx8(Text7, { style: styles7.fabText, children: "＋" }) }),
-    /* @__PURE__ */ jsx8(SafeAreaView, { edges: ["bottom"], style: styles7.tabBar, children: [
+    /* @__PURE__ */ jsx6(Pressable4, { onPress: openNew, style: styles5.fab, children: /* @__PURE__ */ jsx6(Text5, { style: styles5.fabText, children: "＋" }) }),
+    /* @__PURE__ */ jsx6(SafeAreaView, { edges: ["bottom"], style: styles5.tabBar, children: [
       { key: "circle", label: "サークル", Icon: CircleTabIcon },
       { key: "calendar", label: "カレンダー", Icon: CalendarTabIcon }
-    ].map((t) => /* @__PURE__ */ jsxs8(Pressable6, { onPress: () => setTab(t.key), style: styles7.tabItem, children: [
-      /* @__PURE__ */ jsx8(t.Icon, { color: tab === t.key ? colors.accent : colors.textMuted }),
-      /* @__PURE__ */ jsx8(Text7, { style: [styles7.tabLabel, tab === t.key && { color: colors.text }], children: t.label })
+    ].map((t) => /* @__PURE__ */ jsxs6(Pressable4, { onPress: () => setTab(t.key), style: styles5.tabItem, children: [
+      /* @__PURE__ */ jsx6(t.Icon, { color: tab === t.key ? colors.accent : colors.textMuted }),
+      /* @__PURE__ */ jsx6(Text5, { style: [styles5.tabLabel, tab === t.key && { color: colors.text }], children: t.label })
     ] }, t.key)) }),
-    /* @__PURE__ */ jsx8(
+    /* @__PURE__ */ jsx6(
       EventEditor,
       {
         visible: editorOpen,
@@ -1309,50 +794,16 @@ function Main() {
         onDelete: handleDelete,
         onClose: () => setEditorOpen(false)
       }
-    ),
-    /* @__PURE__ */ jsx8(
-      SettingsSheet,
-      {
-        visible: settingsOpen,
-        settings,
-        onChange: (next) => {
-          setSettings(next);
-          saveSettings(next);
-        },
-        onClose: () => setSettingsOpen(false)
-      }
-    ),
-    /* @__PURE__ */ jsx8(
-      BriefingOverlay,
-      {
-        visible: briefing !== null,
-        segments: briefing ?? [],
-        index: briefIndex,
-        events,
-        title: `${dayLabel ?? ""} ${dateTitle}`.trim(),
-        onStop: stopBriefing,
-        onSkip: () => briefHandle.current?.skip()
-      }
     )
   ] });
 }
 function App() {
-  return /* @__PURE__ */ jsx8(SafeAreaProvider, { children: /* @__PURE__ */ jsx8(Main, {}) });
+  return /* @__PURE__ */ jsx6(SafeAreaProvider, { children: /* @__PURE__ */ jsx6(Main, {}) });
 }
-var styles7 = StyleSheet7.create({
+var styles5 = StyleSheet5.create({
   root: { flex: 1, backgroundColor: colors.bg },
   scroll: { padding: 20, paddingBottom: 140, width: "100%", maxWidth: 560, alignSelf: "center" },
   headerRow: { flexDirection: "row", alignItems: "center" },
-  gear: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center"
-  },
   kicker: { color: colors.accent, fontSize: 12, fontWeight: "700", letterSpacing: 5 },
   date: { color: colors.text, fontSize: 30, fontWeight: "800", marginTop: 4 },
   segment: {
@@ -1383,28 +834,6 @@ var styles7 = StyleSheet7.create({
   halfActive: { backgroundColor: colors.accent },
   halfText: { color: colors.textMuted, fontSize: 13, fontWeight: "700" },
   halfTextActive: { color: "#fff" },
-  briefBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    marginTop: 18,
-    padding: 16,
-    borderRadius: 20,
-    backgroundColor: colors.accentSoft,
-    borderWidth: 1,
-    borderColor: "rgba(108,140,255,0.35)"
-  },
-  playIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.accent,
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  playGlyph: { color: "#fff", fontSize: 16, marginLeft: 3 },
-  briefTitle: { color: colors.text, fontSize: 16, fontWeight: "700" },
-  briefSub: { color: colors.textSub, fontSize: 12, marginTop: 2 },
   sectionRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
   clearAll: { color: colors.danger, fontSize: 12, fontWeight: "700" },
   section: { color: colors.textSub, fontSize: 12, letterSpacing: 2, marginTop: 26, marginBottom: 10, fontWeight: "700" },
